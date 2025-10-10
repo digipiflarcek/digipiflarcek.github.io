@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DigiPiflarček</title>
+
+<style>
+:root{
+  --bg1:#0f2027; --bg2:#203a43; --bg3:#2c5364;
+  --card:#ffffff;
+  --glass: rgba(255,255,255,.14);
+  --glass-brd: rgba(255,255,255,.3);
+  --accent:#24c1ff; --accent-dark:#16a2d6;
+  --ok:#24c97b; --warn:#f5a524; --err:#ff5a5f;
+  --shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:#f3f7fb;
+  background: radial-gradient(1200px 800px at 10% -10%, #2f6aa8 0%, transparent 60%),
+              radial-gradient(1200px 800px at 110% 110%, #2f6aa8 0%, transparent 60%),
+              linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3));
+  background-attachment: fixed;
+  font: 15px/1.55 "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+a{color:#fff}
+header{
+  position:sticky; top:0; z-index:50;
+  display:flex; gap:16px; align-items:center; justify-content:center;
+  padding:16px 14px; font-size:26px; font-weight:800; letter-spacing:.3px;
+  background: rgba(0,0,0,.25); backdrop-filter: blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.08);
+  box-shadow: var(--shadow);
+}
+.subbar{
+  position:sticky; top:64px; z-index:40;
+  display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+  padding:10px; background: rgba(0,0,0,.2); backdrop-filter: blur(8px);
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.btn{
+  background: var(--accent); color:#012; border:none; outline:none;
+  padding:10px 16px; border-radius:12px; cursor:pointer; font-weight:700;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25); transition:.18s;
+}
+.btn:hover{background:var(--accent-dark); transform: translateY(-1px);}
+.btn.ghost{ background:transparent; color:#e9f6ff; border:1px solid rgba(255,255,255,.35) }
+.btn.bad{ background:var(--err); color:#fff }
+.btn.ok { background:var(--ok); color:#001 }
+.btn.warn{ background:var(--warn); color:#000 }
+.input, .ta, .sel{
+  width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.12); color:#e9f6ff;
+}
+.input::placeholder, .ta::placeholder{color:#dbe8ff}
+.glass{
+  background: var(--glass); border:1px solid var(--glass-brd); border-radius:16px; box-shadow: var(--shadow);
+}
+.card{
+  background:#fff; color:#0d1b2a; border-radius:16px; box-shadow: var(--shadow);
+  border:1px solid rgba(0,0,0,.08);
+}
+.wrap{ max-width:1200px; margin:18px auto; padding:0 14px; }
+
+/* Vstop / auth */
+#authBox{ max-width:480px; margin:80px auto; padding:22px; }
+
+/* Izdaje seznam */
+.issue{
+  display:flex; align-items:center; gap:12px; padding:12px; margin:8px 0;
+  background:#fff; color:#102a43; border-radius:12px; box-shadow: var(--shadow);
+  border:1px solid rgba(0,0,0,.06); cursor:pointer;
+}
+.issue .badge{ margin-left:auto }
+
+/* List člankov */
+.article{ overflow:hidden; border-radius:16px; margin:12px 0; }
+.article .head{ background: #e6f1ff; border-bottom:1px solid #d6e8ff; padding:10px 12px; }
+.article .title{ font-size:18px; font-weight:800; color:#102a43 }
+.article .desc{ color:#2f4f7a }
+.article .body{ display:flex; gap:0; background:#fff; color:#0b1f2a }
+.article .img{ flex:0 0 220px; display:flex; align-items:center; justify-content:center; padding:10px; border-right:1px solid rgba(0,0,0,.06); background:#f6f9ff }
+.article img{ max-width:210px; max-height:160px; border-radius:12px; object-fit:cover }
+.article .ops{ display:flex; gap:8px; align-items:center; padding:10px; }
+.hoverPrev{ transform:translateY(150px); transition:transform .2s ease; padding:10px 12px; border-top:1px solid rgba(0,0,0,.06); background:#fff; color:#111 }
+.article:hover .hoverPrev{ transform:translateY(0) }
+
+/* Paper view (A4 style) */
+.paper{
+  background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:16px; line-height:1.8;
+  box-shadow:0 10px 20px rgba(0,0,0,.15);
+}
+.viewer-wrap{ display:flex; justify-content:center; }
+.viewer-a4{
+  width:210mm; min-height:297mm; background:#fff; color:#111;
+  border:1px solid rgba(0,0,0,.1); border-radius:8px; padding:20mm; line-height:1.7;
+  box-shadow:0 16px 32px rgba(0,0,0,.25);
+  background-image: radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px); background-size:6px 6px;
+}
+
+/* A4 Editor */
+.editor-stage{ display:flex; gap:14px; align-items:flex-start; justify-content:center; min-height:70vh; }
+.tool-left, .tool-right{
+  position:fixed; top:96px; width:64px; display:flex; flex-direction:column; gap:8px; padding:8px;
+  background:rgba(255,255,255,.12); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,.25);
+  border-radius:16px; z-index:30;
+}
+.tool-left{ left:14px }
+.tool-right{ right:14px }
+.tool-left .btn, .tool-right .btn{ padding:8px 6px; border-radius:10px; font-weight:700 }
+.a4-wrap{ flex:1; display:flex; justify-content:center; }
+.a4{
+  width:210mm; min-height:297mm; background:#fff; color:#111;
+  border:1px solid rgba(0,0,0,.1); border-radius:8px; padding:20mm; line-height:1.7;
+  box-shadow:0 16px 32px rgba(0,0,0,.25);
+  background-image: radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px); background-size:6px 6px;
+  transform-origin: top center;
+}
+.meta-box{
+  background:#e9f2ff; border:1px solid #d5e5ff; border-radius:12px; padding:10px 12px; margin-bottom:8px;
+}
+.meta-box .meta-title{ width:100%; padding:10px; border-radius:8px; border:1px solid #cfe1ff; background:#fff; font-size:20px; font-weight:800; color:#163a66 }
+.meta-box .meta-desc{ width:100%; height:64px; margin-top:6px; padding:10px; border-radius:8px; border:1px solid #cfe1ff; background:#fff; color:#163a66 }
+
+/* Chat */
+#chatBox{ height:420px; overflow:auto }
+.chatRow{ background:rgba(36,193,255,.12); color:#073b59; padding:8px 10px; margin:6px 0; border-radius:12px }
+
+/* Admin */
+.badge{ padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(0,0,0,.08) }
+.badge.ok{ background:#eafff5; color:#064 }
+.badge.wait{ background:#fff6e5; color:#6a4300 }
+
+/* Sticky radio button */
+#radioSticky{
+  position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%;
+  background:rgba(255,255,255,.22); border:1px solid rgba(255,255,255,.45); backdrop-filter: blur(10px);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:9999;
+  box-shadow:0 8px 24px rgba(0,0,0,.35); transition:.18s;
+  font-size:20px;
+}
+#radioSticky:hover{ transform:scale(1.06); background:rgba(255,255,255,.3) }
+#radioTooltip{
+  position:fixed; right:86px; bottom:36px; padding:6px 10px; border-radius:10px; background:rgba(255,255,255,.98);
+  color:#111; border:1px solid rgba(0,0,0,.08); box-shadow:0 10px 24px rgba(0,0,0,.25); display:none; z-index:9999;
+}
+
+/* Print */
+@media print{
+  header,.subbar,.tool-left,.tool-right,#radioSticky,#radioTooltip{ display:none !important }
+  body{ background:#fff }
+  .a4,.viewer-a4{ box-shadow:none; border:none }
+}
+
+/* Slike v A4 */
+.a4 img{
+  max-width:100%;
+  height:auto;
+  display:block;
+  margin:8px 0;
+}
+</style>
+</head>
+<body>
+
+<header>📰 DigiPiflarček</header>
+<div class="subbar" id="navBar" style="display:none">
+  <button class="btn" id="navArticles">Članki</button>
+  <button class="btn" id="navChat">Chat</button>
+  <button class="btn" id="navRadio">Šolski radio</button>
+  <button class="btn" id="navProfile">Profil</button>
+  <button class="btn" id="navAdmin" style="display:none">Admin</button>
+  <button class="btn ghost" id="navLogout">Odjava</button>
+</div>
+
+<!-- AUTH -->
+<div id="authBox" class="wrap glass">
+  <h2 style="margin-top:0">Dobrodošel! ✨</h2>
+
+  <div style="margin:6px 0 12px 0; padding:10px 12px; border:1px solid rgba(255,255,255,.35); border-radius:10px; background:rgba(255,255,255,.10);">
+    <div style="opacity:.95">
+      DigiPiflarček je šolski digitalni časopis. Bereš članke, poslušaš šolski radio, klepetaš s sošolci
+      in pišeš svoje prispevke na A4 urejevalniku – kot v Wordu. Admin pregleda prispevke in jih objavi.
+    </div>
+    <ul style="margin:8px 0 0 18px; padding:0; line-height:1.5; opacity:.95">
+      <li>📰 Izdaje (mesec/leto) in članki</li>
+      <li>✍️ Urejevalnik člankov (A4, WYSIWYG)</li>
+      <li>📻 Šolski radio + obvestila</li>
+      <li>💬 Klepet (ime in priimek)</li>
+    </ul>
+  </div>
+
+  <p>Vstopi kot <b>gost</b> ali se prijavi / registriraj.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" id="btnGuest">Gost</button>
+    <button class="btn" id="btnLogin">Prijava</button>
+    <button class="btn" id="btnReg">Registracija</button>
+  </div>
+
+  <div id="loginBox" style="display:none;margin-top:10px">
+    <input class="input" id="lUser" placeholder="Email ali uporabniško ime">
+    <input class="input" id="lPass" type="password" placeholder="Geslo">
+    <button class="btn" id="doLogin">Prijavi se</button>
+  </div>
+
+  <div id="regBox" style="display:none;margin-top:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input class="input" id="rName" placeholder="Ime">
+      <input class="input" id="rSurname" placeholder="Priimek">
+    </div>
+    <input class="input" id="rEmail" placeholder="Email">
+    <input class="input" id="rUser" placeholder="Uporabniško ime">
+    <input class="input" id="rPass" type="password" placeholder="Geslo">
+    <button class="btn" id="doReg">Ustvari račun</button>
+  </div>
+
+  <div id="authMsg" style="margin-top:8px;opacity:.9"></div>
+</div>
+
+<!-- STAGE (dinamična vsebina) -->
+<div id="stage" class="wrap"></div>
+
+<!-- Sticky radio -->
+<div id="radioSticky">▶️</div>
+<div id="radioTooltip"></div>
+<!-- Skrit HTML5 avdio predvajalnik -->
+<audio id="radioAudio" preload="auto"></audio>
+
+<!-- ============== JS – celoten app ============== -->
+<script type="module">
+import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, setDoc, doc, getDoc,
+  where, updateDoc, deleteDoc, getDocs, documentId
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL }
+ from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBQaD0MGnuMa45hm_99VvOwNsTdCoFPgNI",
+  authDomain: "school-12a1f.firebaseapp.com",
+  projectId: "school-12a1f",
+  storageBucket: "school-12a1f.appspot.com",
+  messagingSenderId: "539327102547",
+  appId: "1:539327102547:web:bd2571f5d327faafaed0a6",
+  measurementId: "G-GBG9YCLE12"
+};
+initializeApp(firebaseConfig);
+const app  = getApp();
+export const auth = getAuth(app);
+export const db   = getFirestore(app);
+const st         = getStorage(app);
+const stage      = document.getElementById('stage');
+
+/* ---------------- Router ---------------- */
+window.navigate = navigate;
+window.render   = render;
+window.backify  = backify;
+
+function render(view, params){
+  if(view==='home')      return window.openEditions?.();
+  if(view==='issue')     return window.openIssue?.(params);
+  if(view==='article')   return window.openArticleView?.(params);
+  if(view==='chat')      return window.openChat?.();
+  if(view==='radio')     return window.openRadio?.();
+  if(view==='profile')   return window.openProfile?.();
+  if(view==='admin')     return window.openAdmin?.();
+  if(view==='editor')    return window.openEditor?.(params||null);
+}
+function navigate(view, params={}, push=true){
+  render(view, params);
+  if(push) history.pushState({view,params}, '', '#'+view+(params?.id?('-'+params.id):''));
+}
+window.addEventListener('popstate', e=>{
+  const s=e.state||{view:'home',params:{}};
+  render(s.view, s.params);
+});
+function backify(id='backBtn'){
+  const b=document.getElementById(id);
+  if(b) b.onclick=()=>history.back();
+}
+
+/* ---------------- Auth UI ---------------- */
+const authBox   = document.getElementById('authBox');
+const navBar    = document.getElementById('navBar');
+const authMsg   = document.getElementById('authMsg');
+
+document.getElementById('btnGuest').onclick = ()=> enterApp('guest');
+document.getElementById('btnLogin').onclick = ()=>{ document.getElementById('loginBox').style.display='block'; document.getElementById('regBox').style.display='none'; }
+document.getElementById('btnReg').onclick   = ()=>{ document.getElementById('loginBox').style.display='none'; document.getElementById('regBox').style.display='block'; }
+
+document.getElementById('doReg').onclick = async ()=>{
+  const name = rName.value.trim(), sur=rSurname.value.trim(), email=rEmail.value.trim(), user=rUser.value.trim(), pass=rPass.value;
+  if(!name||!sur||!email||!user||!pass) return authMsg.textContent='Izpolni vsa polja.';
+  try{
+    await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db,'users',auth.currentUser.uid),{name,surname:sur,email,user,role:'user',created:serverTimestamp()});
+    try{ await setDoc(doc(db,'usernames',user),{email}); }catch{}
+    authMsg.textContent='Račun ustvarjen. Prijavi se.';
+  }catch(e){ authMsg.textContent=e.message; }
+};
+document.getElementById('doLogin').onclick = async ()=>{
+  try{
+    let email = lUser.value.trim();
+    if(!email.includes('@')){
+      const u = await window.lookupUserByUsername(email);
+      if(!u) throw new Error('Uporabniško ime ne obstaja.');
+      email = u.email;
+    }
+    await signInWithEmailAndPassword(auth, email, lPass.value);
+  }catch(e){ authMsg.textContent=e.message; }
+};
+document.getElementById('navLogout').onclick = ()=>signOut(auth);
+
+async function refreshAdminButton(){
+  const btn = document.getElementById('navAdmin');
+  btn.style.display='none';
+  if(!auth.currentUser) return;
+  const u = await getDoc(doc(db,'users',auth.currentUser.uid));
+  if(u.exists() && u.data().role==='admin') btn.style.display='inline-block';
+}
+
+/* ---------------- Chat ---------------- */
+const chatCol = collection(db,'chat');
+window.openChat = function(){
+  stage.innerHTML = `
+    <div class="glass wrap" style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0">💬 Šolski chat</h2>
+        <button class="btn ghost" id="backBtn">Nazaj</button>
+      </div>
+      <div id="chatBox" class="card" style="padding:14px;margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input class="input" id="chatText" placeholder="Napiši sporočilo...">
+        <button class="btn" id="chatSend">Pošlji</button>
+      </div>
+    </div>
+  `;
+  backify();
+  const box = document.getElementById('chatBox');
+  const q   = query(chatCol, orderBy('time','asc'));
+  onSnapshot(q, snap=>{
+    box.innerHTML='';
+    snap.forEach(d=>{
+      const x=d.data();
+      const div=document.createElement('div');
+      div.className='chatRow';
+      div.innerHTML = `<span style="font-weight:800">${x.userName||'Gost'}</span><br>${x.text}`;
+      box.appendChild(div);
+    });
+    box.scrollTop=box.scrollHeight;
+  });
+  document.getElementById('chatSend').onclick = async ()=>{
+    const text = chatText.value.trim(); if(!text) return;
+    let userName='Gost';
+    if(auth.currentUser){
+      const u = await getDoc(doc(db,'users',auth.currentUser.uid));
+      if(u.exists()) userName = `${u.data().name||''} ${u.data().surname||''}`.trim() || 'Uporabnik';
+    }
+    await addDoc(chatCol,{ userName, text, time: serverTimestamp() });
+    chatText.value='';
+  };
+}
+
+/* ---------------- Sticky radio – playback ---------------- */
+const radioBtn = document.getElementById('radioSticky');
+const tip      = document.getElementById('radioTooltip');
+const audioEl  = document.getElementById('radioAudio');
+
+let localPlay  = false;
+let schedule   = { order:[], tracks:[], repeatPerDay:1, baseStartAt:null };
+let nowIdx     = 0;
+let nextTimer  = null;
+let stateUnsub = null;
+
+radioBtn.addEventListener('mouseenter', ()=>{ tip.style.display='block'; tip.textContent='Šolski radio'; });
+radioBtn.addEventListener('mouseleave', ()=> tip.style.display='none');
+audioEl.addEventListener('ended', ()=> playIndex(nowIdx+1));
+
+radioBtn.onclick = async ()=>{
+  if(schedule.order.length===0){
+    const ok = await loadSchedule();
+    if(!ok){ alert('Radio se pripravlja (ni objavljen spored ali ni skladb).'); return; }
+  }
+  localPlay = !localPlay;
+  if(localPlay){ startPlayback(); } else { stopPlayback(); }
+};
+
+async function loadSchedule(){
+  try{
+    const stDoc = await getDoc(doc(db,'radioState','scheduler'));
+    if(!stDoc.exists()) return false;
+    const st = stDoc.data();
+    const ord = Array.isArray(st.order)? st.order.filter(Boolean) : [];
+    if(ord.length===0) return false;
+
+    const tracks = [];
+    for(let i=0;i<ord.length;i+=10){
+      const chunk = ord.slice(i,i+10);
+      if(chunk.length===0) continue;
+      const snap  = await getDocs(query(collection(db,'radioTracks'), where(documentId(),'in', chunk)));
+      const byId  = {};
+      snap.forEach(d=> byId[d.id] = d.data());
+      chunk.forEach(id=>{
+        const t = byId[id];
+        if(!t) return;
+        const dur = Number.isFinite(+t.durationSec) ? Math.max(10, parseInt(t.durationSec,10)) : 180;
+        const url = (t.url||'').trim();
+        if(!url) return;
+        tracks.push({ id, title: t.title||'Skladba', url, durationSec: dur });
+      });
+    }
+    if(tracks.length===0) return false;
+
+    schedule.order        = ord;
+    schedule.tracks       = tracks;
+    schedule.repeatPerDay = Math.max(1, parseInt(st.repeatPerDay||1,10));
+    schedule.baseStartAt  = st.baseStartAt?.toMillis ? st.baseStartAt.toMillis() : Date.now();
+
+    nowIdx = computeIndexFromClock();
+
+    if(stateUnsub) try{ stateUnsub(); }catch{}
+    stateUnsub = onSnapshot(doc(db,'radioState','scheduler'), async (snap)=>{
+      if(!snap.exists()) return;
+      const newOrder = snap.data().order || [];
+      if(JSON.stringify(newOrder)!==JSON.stringify(schedule.order) ||
+         (snap.data().repeatPerDay||1)!==schedule.repeatPerDay){
+        stopPlayback(false);
+        schedule.order = [];
+        await loadSchedule();
+        if(localPlay) startPlayback();
+      }
+    });
+
+    return true;
+  }catch(e){
+    console.warn('loadSchedule fail', e);
+    return false;
+  }
+}
+function computeIndexFromClock(){
+  const tracks = schedule.tracks;
+  const elapsedMs = Date.now() - schedule.baseStartAt;
+  const totalDurS = tracks.reduce((sum,t)=> sum + (parseInt(t.durationSec||180,10)||180), 0);
+  const loopS     = Math.max(1, totalDurS) * Math.max(1, schedule.repeatPerDay);
+  const posS      = Math.floor((elapsedMs/1000) % loopS);
+
+  let acc=0, idx=0;
+  for(let i=0;i<tracks.length;i++){
+    const d = Math.max(10, parseInt(tracks[i].durationSec||180,10));
+    if(posS < acc + d){ idx = i; break; }
+    acc += d;
+    if(i===tracks.length-1) idx = 0;
+  }
+  return idx;
+}
+function startPlayback(){
+  if(schedule.tracks.length===0){ alert('Radio se pripravlja (prazna lista).'); localPlay=false; return; }
+  nowIdx = computeIndexFromClock();
+  playIndex(nowIdx);
+  radioBtn.textContent = '⏸️';
+}
+function stopPlayback(resetTip=true){
+  clearTimeout(nextTimer);
+  if(!audioEl.paused) audioEl.pause();
+  radioBtn.textContent = '▶️';
+  if(resetTip) tip.textContent = 'Šolski radio';
+}
+function playIndex(i){
+  clearTimeout(nextTimer);
+  const n = schedule.tracks.length;
+  if(n===0){ stopPlayback(); return; }
+  nowIdx = ((i % n) + n) % n;
+  const cur = schedule.tracks[nowIdx];
+  const nxt = schedule.tracks[(nowIdx+1)%n];
+
+  audioEl.src = cur.url;
+  audioEl.play().catch(()=>{});
+  tip.textContent = `${cur.title}${nxt?(' → '+nxt.title):''}`;
+
+  const dur = Math.max(10, parseInt(cur.durationSec||180,10));
+  nextTimer = setTimeout(()=> playIndex(nowIdx+1), dur*1000);
+}
+
+/* ---------------- Home → IZDAJE ---------------- */
+document.getElementById('navArticles').onclick = ()=>navigate('home');
+document.getElementById('navChat').onclick     = ()=>navigate('chat');
+document.getElementById('navRadio').onclick    = ()=>navigate('radio');
+document.getElementById('navProfile').onclick  = ()=>navigate('profile');
+document.getElementById('navAdmin').onclick    = ()=>navigate('admin');
+
+/* Helper: username → email */
+window.lookupUserByUsername = async (username)=>{
+  try{
+    const d = await getDoc(doc(db,'usernames',username));
+    return d.exists()? d.data() : null;
+  }catch{return null}
+};
+
+/* --------- Pomožne --------- */
+function badge(ok){ return `<span class="badge ${ok?'ok':'wait'}">${ok?'OBJAVLJENO':'ČAKALNICA'}</span>`; }
+
+/* ============================================================
+   IZDAJE – seznam (home)
+============================================================ */
+window.openEditions = function(){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">📰 Izdaje</div>
+      <div>${auth.currentUser? `<button class="btn" id="btnAdd">+ Članek</button>`:''}</div>
+    </div>
+    <div class="wrap" id="editionList"></div>
+  `;
+  if(auth.currentUser) document.getElementById('btnAdd').onclick = ()=>navigate('editor');
+
+  const box = document.getElementById('editionList');
+  onSnapshot(
+    query(collection(db,'editions'), where('published','==',true), orderBy('year','desc'), orderBy('month','desc')),
+    (snap)=>{
+      box.innerHTML = '';
+      if(snap.empty){
+        const inf=document.createElement('div');
+        inf.className='glass'; inf.style.cssText='padding:12px';
+        inf.textContent='Ni objavljenih izdaj.';
+        box.appendChild(inf);
+        return;
+      }
+      snap.forEach(ed=>{
+        const e=ed.data();
+        const item=document.createElement('div');
+        item.className='issue';
+        const title = e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
+        const range = (e.activeFrom||'') && (e.activeTo||'') ? ` · ${e.activeFrom}–${e.activeTo}` : '';
+        item.innerHTML = `
+          <div style="font-weight:800">${title}</div>
+          <div style="color:#2f4f7a">${String(e.month).padStart(2,'0')}/${e.year}${range}</div>
+          <span class="badge ok">OBJAVLJENO</span>
+        `;
+        item.onclick = ()=> navigate('issue', { id: ed.id, title, month: e.month, year: e.year });
+        box.appendChild(item);
+      });
+    },
+    (err)=> {
+      box.innerHTML = `<div class="glass" style="padding:12px">Napaka pri branju izdaj: ${err.message}</div>`;
+    }
+  );
+};
+
+/* ============================================================
+   SEZNAM ČLANKOV V IZDAJI
+============================================================ */
+window.openIssue = function(iss){
+  const title = iss?.title || `Izdaja ${String(iss?.month||'').padStart(2,'0')}/${iss?.year||''}`;
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">📰 ${title}</div>
+      <div>
+        <button class="btn ghost" id="backBtn">Nazaj na izdaje</button>
+      </div>
+    </div>
+    <div id="list"></div>
+  `;
+  backify();
+
+  const list=document.getElementById('list');
+  onSnapshot(
+    query(collection(db,'articles'), where('approved','==',true), where('editionId','==', iss.id), orderBy('created','desc')),
+    (snap)=>{
+      list.innerHTML='';
+      if(snap.empty){
+        const inf=document.createElement('div');
+        inf.className='glass'; inf.style.cssText='padding:12px;background:#fff;color:#102a43';
+        inf.textContent='V tej izdaji še ni člankov.';
+        list.appendChild(inf);
+        return;
+      }
+      snap.forEach(d=>{
+        const data=d.data();
+        const plain=(data.content||'').replace(/<[^>]+>/g,'');
+        const preview = data.desc?.trim()? data.desc.trim() : (plain.substring(0,160)+'…');
+        const card=document.createElement('div');
+        card.className='article card';
+        card.innerHTML=`
+          <div class="head"><div class="title">${data.title}</div><div class="desc">${preview}</div></div>
+          <div class="body">
+            ${data.img? `<div class="img"><img src="${data.img}"></div>`:''}
+            <div style="flex:1;padding:10px 12px">
+              <div class="ops">
+                <button class="btn read">Odpri</button>
+                ${auth.currentUser? `<button class="btn ghost save">Shrani</button>`:''}
+                <span style="margin-left:auto;color:#5a6c7d;font-size:12px">${data.created?.toDate? data.created.toDate().toLocaleString():''}</span>
+              </div>
+            </div>
+          </div>
+          <div class="hoverPrev">${plain.substring(0,420)}${plain.length>420?'…':''}</div>
+        `;
+        card.querySelector('.read').onclick = ()=>navigate('article',{id:d.id,...data});
+        const sbtn = card.querySelector('.save');
+        if(sbtn){
+          sbtn.onclick = ()=> setDoc(doc(db,'users',auth.currentUser.uid,'favorites',d.id),{
+            articleId:d.id,title:data.title,img:data.img||'',savedAt:serverTimestamp()
+          });
+        }
+        list.appendChild(card);
+      });
+    },
+    (err)=> list.innerHTML = `<div class="glass" style="padding:12px;background:#fff;color:#102a43">Napaka: ${err.message}</div>`
+  );
+};
+
+/* ============================================================
+   OGLED članka – A4 VIEWER (brez urejevanja)
+============================================================ */
+window.openArticleView = function(d){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">📰 Članek</div>
+      <button class="btn ghost" id="backBtn">Nazaj</button>
+    </div>
+    <div class="card" style="padding:16px;margin-top:10px">
+      <div class="meta-box">
+        <div style="font-size:22px;font-weight:900;color:#102a43">${d.title}</div>
+        <div class="desc" style="color:#2f4f7a">${d.desc||''}</div>
+      </div>
+      ${d.img? `<img src="${d.img}" style="max-width:100%;border-radius:12px;margin:8px 0">`:''}
+      <div class="viewer-wrap">
+        <div class="viewer-a4">
+          ${d.content||''}
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+};
+
+/* ============================================================
+   A4 UREJEVALNIK – z lokalnim uploadom slik (brez CORS)
+============================================================ */
+window.openEditor = function(existing=null){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">✍️ Urejevalnik (A4)</div>
+      <div>
+        <button class="btn" id="saveBtn">💾 Shrani</button>
+        <button class="btn ghost" id="backBtn">Nazaj</button>
+      </div>
+    </div>
+
+    <div class="editor-stage">
+      <!-- orodja levo -->
+      <div class="tool-left">
+        <select class="sel" id="fontName">
+          <option value="inherit">Font</option>
+          <option>Arial</option><option>Times New Roman</option>
+          <option>Georgia</option><option>Calibri</option><option>Cambria</option>
+        </select>
+        <select class="sel" id="fontSize">
+          <option value="2">10pt</option><option value="3" selected>12pt</option>
+          <option value="4">14pt</option><option value="5">18pt</option><option value="6">24pt</option>
+        </select>
+        <select class="sel" id="headings">
+          <option value="P">Navadno</option>
+          <option value="H1">H1</option><option value="H2">H2</option><option value="H3">H3</option>
+        </select>
+        <input type="color" id="foreColor" title="Barva besedila">
+        <input type="color" id="backColor" title="Ozadje besedila">
+        <button class="btn" data-cmd="bold"><b>B</b></button>
+        <button class="btn" data-cmd="italic"><i>I</i></button>
+        <button class="btn" data-cmd="underline"><u>U</u></button>
+        <button class="btn" data-cmd="strikeThrough">S</button>
+        <button class="btn" data-cmd="insertUnorderedList">•</button>
+        <button class="btn" data-cmd="insertOrderedList">1.</button>
+        <button class="btn" data-cmd="outdent">↤</button>
+        <button class="btn" data-cmd="indent">↦</button>
+      </div>
+
+      <!-- list -->
+      <div class="a4-wrap">
+        <div style="max-width:210mm;width:100%;">
+          <div class="meta-box">
+            <input class="meta-title" id="titleInput" placeholder="Naslov članka">
+            <textarea class="meta-desc" id="descInput" maxlength="150" placeholder="Kratek opis (za seznam) – do 150 znakov"></textarea>
+            <div style="display:flex; gap:8px; margin-top:6px; align-items:center">
+              <label style="color:#163a66; font-weight:800">Izdaja:</label>
+              <select id="editionSelect" class="sel" style="max-width:340px"></select>
+              <small style="color:#456">(izberi številko izdaje)</small>
+            </div>
+          </div>
+          <div id="paper" class="a4" contenteditable="true"><p>Začni pisati svoj članek tukaj…</p></div>
+          <div style="text-align:center;color:#7a8aa0;margin:8px 0">Stran 1</div>
+
+          <!-- naslovna slika -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label>Naslovna slika:</label>
+            <input id="imgUpload" type="file" accept="image/*" class="input" style="max-width:320px">
+            <span id="imgHeroInfo" style="font-size:12px;color:#cfe7ff"></span>
+          </div>
+
+          <!-- skriti input za "🖼️" gumb (vstavi sliko v vsebino) + progress -->
+          <input id="inlineImgInput" type="file" accept="image/*" style="display:none">
+          <div id="imgUpWrap" style="height:6px;background:#eee;border-radius:6px;overflow:hidden;margin-top:6px;display:none">
+            <div id="imgUpBar" style="height:100%;width:0%;background:#24c1ff;transition:width .15s linear"></div>
+          </div>
+          <div id="imgUpTxt" style="font-size:12px;color:#234;margin-top:4px;display:none">Pripravljeno…</div>
+        </div>
+      </div>
+
+      <!-- orodja desno -->
+      <div class="tool-right">
+        <button class="btn" id="sup">x²</button>
+        <button class="btn" id="sub">x₂</button>
+        <button class="btn" id="linkBtn">🔗</button>
+        <button class="btn" id="imgBtn">🖼️</button>
+        <button class="btn" id="tableBtn">▦</button>
+        <button class="btn" id="clearFmt">⌫</button>
+        <button class="btn" id="undoBtn">↶</button>
+        <button class="btn" id="redoBtn">↷</button>
+        <button class="btn" id="exportPdf">🖨️</button>
+        <button class="btn" id="exportHtml">⬇️</button>
+        <div class="glass" style="padding:6px 8px;text-align:center">
+          <div>Zoom</div>
+          <button class="btn" id="zOut">−</button>
+          <div id="zVal" style="padding:4px 0;font-weight:800">100%</div>
+          <button class="btn" id="zIn">＋</button>
+          <div id="wc" style="margin-top:6px;font-size:12px;color:#e4f6ff">0 besed</div>
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+
+  // napolni izdajni select
+  const sel = document.getElementById('editionSelect');
+  sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
+  onSnapshot(
+    query(collection(db,'editions'), where('published','==',true), orderBy('year','desc'), orderBy('month','desc')),(snap)=>{
+      sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
+      snap.forEach(ed=>{
+        const e=ed.data();
+        const title = e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
+        const opt = document.createElement('option');
+        opt.value = ed.id;
+        opt.textContent = `${title}`;
+        sel.appendChild(opt);
+      });
+      if(existing?.editionId) sel.value = existing.editionId;
+    }
+  );
+
+  // komande
+  document.querySelectorAll('[data-cmd]').forEach(b=> b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));
+  const paper=document.getElementById('paper');
+  const title=document.getElementById('titleInput');
+  const desc =document.getElementById('descInput');
+
+  foreColor.onchange=e=>document.execCommand('foreColor',false,e.target.value);
+  backColor.onchange=e=>document.execCommand('hiliteColor',false,e.target.value);
+  fontName.onchange=e=>document.execCommand('fontName',false,e.target.value);
+  fontSize.onchange=e=>document.execCommand('fontSize',false,e.target.value);
+  headings.onchange=e=>document.execCommand('formatBlock',false, e.target.value==='P'?'p':e.target.value);
+  sup.onclick = ()=>document.execCommand('superscript',false,null);
+  sub.onclick = ()=>document.execCommand('subscript',false,null);
+  linkBtn.onclick=()=>{ const u=prompt('URL:'); if(u) document.execCommand('createLink',false,u); };
+
+  // NOVO: klik na 🖼️ → izberi lokalno sliko in jo naloži v Storage, nato vstavimo v vsebino
+  const inlineImgInput = document.getElementById('inlineImgInput');
+  const imgBtn = document.getElementById('imgBtn');
+  const imgUpWrap = document.getElementById('imgUpWrap');
+  const imgUpBar  = document.getElementById('imgUpBar');
+  const imgUpTxt  = document.getElementById('imgUpTxt');
+
+  imgBtn.onclick = ()=> inlineImgInput.click();
+  inlineImgInput.onchange = async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const safeName = f.name.replace(/\s+/g,'_');
+    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+    imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
+
+    try{
+      const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
+      await new Promise((resolve,reject)=>{
+        task.on('state_changed', (snap)=>{
+          const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+          imgUpBar.style.width = pct+'%';
+          imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
+        }, reject, resolve);
+      });
+      const url = await getDownloadURL(r);
+      document.execCommand('insertImage', false, url);
+      imgUpTxt.textContent='Končano ✔️';
+    }catch(err){
+      alert('Napaka pri nalaganju slike: '+(err?.message||err));
+      imgUpTxt.textContent='Napaka ❌';
+    }finally{
+      setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 800);
+      inlineImgInput.value='';
+    }
+  };
+
+  tableBtn.onclick=()=>{
+    const r=parseInt(prompt('Vrstice 1–10','3')||'3',10);
+    const c=parseInt(prompt('Stolpci 1–10','3')||'3',10);
+    if(r>0&&c>0&&r<=10&&c<=10){
+      let html='<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;">';
+      for(let i=0;i<r;i++){ html+='<tr>'; for(let j=0;j<c;j++){ html+='<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>'; } html+='</tr>'; }
+      html+='</table>'; document.execCommand('insertHTML',false,html);
+    }
+  };
+  clearFmt.onclick=()=>{document.execCommand('removeFormat',false,null);document.execCommand('unlink',false,null)};
+  undoBtn.onclick =()=>document.execCommand('undo',false,null);
+  redoBtn.onclick =()=>document.execCommand('redo',false,null);
+  exportPdf.onclick=()=>window.print();
+  exportHtml.onclick=()=>{
+    const blob=new Blob([paper.innerHTML],{type:'text/html;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(title.value||'clanek')+'.html'; a.click();
+  };
+
+  // zoom
+  let zoom=1;
+  function fit(){
+    const target=793;
+    const free = window.innerWidth - 64 - 64 - 60;
+    zoom = Math.max(0.6, Math.min(1.2, free/target));
+    paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%';
+  }
+  window.addEventListener('resize',fit); fit();
+  zIn.onclick =()=>{ zoom=Math.min(2,zoom+0.1); paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%'; };
+  zOut.onclick=()=>{ zoom=Math.max(0.5,zoom-0.1); paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%'; };
+
+  // word count + draft
+  function wc(){ const n=(paper.innerText||'').trim().replace(/\s+/g,' ').split(' ').filter(Boolean).length; document.getElementById('wc').innerText=`${n} besed`; }
+  paper.addEventListener('input',()=>{wc(); saveDraftThrottled();}); wc();
+  const draftKey= auth.currentUser? ('draft_'+auth.currentUser.uid): 'draft_guest';
+  let t=null; function saveDraftThrottled(){ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(draftKey, JSON.stringify({title:title.value,desc:desc.value,content:paper.innerHTML,editionId:editionSelect.value})), 600); }
+  if(!existing){
+    const raw=localStorage.getItem(draftKey); if(raw){ try{ const d=JSON.parse(raw); title.value=d.title||''; desc.value=d.desc||''; if(d.content) paper.innerHTML=d.content; if(d.editionId) editionSelect.value=d.editionId; }catch{} }
+  }else{
+    title.value=existing.title||''; desc.value=existing.desc||''; paper.innerHTML=existing.content||'<p></p>'; document.getElementById('saveBtn').dataset.editId=existing.id||''; if(existing.editionId) editionSelect.value=existing.editionId;
+  }
+
+  // NASLOVNA slika (upload iz računalnika → URL v polje "heroURL")
+  let heroURL = existing?.img || '';
+  imgUpload.onchange = async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const safeName = f.name.replace(/\s+/g,'_');
+    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+    try{
+      await uploadBytes(r,f); 
+      heroURL=await getDownloadURL(r);
+      document.getElementById('imgHeroInfo').textContent='Slika naložena ✔️';
+      // po želji: tudi vstavi v vsebino
+      // document.execCommand('insertImage', false, heroURL);
+    }catch(err){
+      alert('Napaka pri nalaganju slike: '+(err?.message||err));
+      document.getElementById('imgHeroInfo').textContent='Napaka ❌';
+    }
+  };
+
+  // save
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const base={ title:title.value.trim(), desc:desc.value.trim(), content:paper.innerHTML, img:heroURL,
+      author:auth.currentUser? auth.currentUser.email : 'Gost', edited:serverTimestamp(),
+      editionId: editionSelect.value || null
+    };
+    if(!base.title || !base.desc) return alert('Naslov in kratek opis sta obvezna.');
+    if(!base.editionId) if(!confirm('Članek ni dodeljen nobeni izdaji. Nadaljujem?')) return;
+    const id = document.getElementById('saveBtn').dataset.editId;
+    try{
+      if(id){ await updateDoc(doc(db,'articles',id), base); alert('Posodobljeno.'); }
+      else { await addDoc(collection(db,'articles'), {...base, created:serverTimestamp(), approved:false}); alert('Poslano uredniku.'); }
+      localStorage.removeItem(draftKey); navigate('home');
+    }catch(e){ alert('Napaka pri shranjevanju: '+e.message); }
+  };
+};
+
+/* ============================================================
+   PROFIL
+============================================================ */
+window.openProfile = function(){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">👤 Moj profil</div>
+      <button class="btn ghost" id="backBtn">Nazaj</button>
+    </div>
+    <div class="glass" style="padding:14px;margin-top:8px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div class="card" style="flex:1;min-width:260px;padding:12px">
+          <h3 style="margin:0 0 6px 0">Uporabnik</h3>
+          <img id="avatar" src="https://www.gravatar.com/avatar?d=mp&s=120" style="width:120px;height:120px;object-fit:cover;border-radius:50%">
+          <input id="avUp" type="file" accept="image/*" class="input" style="max-width:260px;margin-top:6px">
+          <div id="uName" style="margin-top:6px"></div>
+          <div id="uMail" style="color:#456"></div>
+        </div>
+        <div class="card" style="flex:2;min-width:320px;padding:12px">
+          <h3 style="margin:0 0 6px 0">Moji članki</h3>
+          <div id="myArts"></div>
+          <h3>Shanjeni članki</h3>
+          <div id="favArts"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+  if(!auth.currentUser){ uName.textContent='Gost'; return; }
+  (async()=>{
+    const u=await getDoc(doc(db,'users',auth.currentUser.uid));
+    if(u.exists()){ const d=u.data(); uName.textContent=`${d.name||''} ${d.surname||''}`; uMail.textContent=d.email||auth.currentUser.email; if(d.avatar) avatar.src=d.avatar; }
+  })();
+  avUp.onchange=async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=sRef(st,'avatars/'+auth.currentUser.uid+'.jpg');
+    await uploadBytes(r,f);
+    const url=await getDownloadURL(r);
+    await setDoc(doc(db,'users',auth.currentUser.uid),{avatar:url},{merge:true});
+    avatar.src=url;
+  };
+  onSnapshot(query(collection(db,'articles'), where('author','==',auth.currentUser.email), orderBy('created','desc')), (snap)=>{
+    myArts.innerHTML=''; snap.forEach(s=>{
+      const d=s.data(); const row=document.createElement('div'); row.className='glass'; row.style.cssText='padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+      row.innerHTML = `<b>${d.title}</b> ${badge(d.approved)} ${d.editionId?`<span style="color:#567"> · izdaja</span>`:''}`; myArts.appendChild(row);
+    });
+  });
+  onSnapshot(query(collection(db,'users',auth.currentUser.uid,'favorites'), orderBy('savedAt','desc')), (snap)=>{
+    favArts.innerHTML=''; snap.forEach(s=>{
+      const f=s.data(); const row=document.createElement('div'); row.className='glass'; row.style.cssText='padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a;display:flex;justify-content:space-between';
+      row.innerHTML = `<span>${f.title}</span><button class="btn bad" data-id="${s.id}">Odstrani</button>`;
+      row.querySelector('button').onclick = ()=> deleteDoc(doc(db,'users',auth.currentUser.uid,'favorites',s.id));
+      favArts.appendChild(row);
+    });
+  });
+};
+
+/* ============================================================
+   ADMIN – izdaje + članki + radio (MP3) + obvestila
+============================================================ */
+window.openAdmin = async function(){
+  let isAdmin = false;
+  if (auth.currentUser) {
+    try {
+      const u = await getDoc(doc(db, 'users',auth.currentUser.uid));
+      isAdmin = u.exists() && u.data().role === 'admin';
+    } catch (e) { console.warn('Admin check failed:', e); }
+  }
+  if (!isAdmin) {
+    stage.innerHTML = `<div class="glass" style="padding:16px">⛔ Dostop zavrnjen.</div>`;
+    return;
+  }
+
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">🛠️ Admin panel</div>
+      <button class="btn ghost" id="backBtn">Nazaj</button>
+    </div>
+
+    <div class="wrap" style="padding:0">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+        <!-- IZDAJE -->
+        <div class="glass" style="flex:1;min-width:320px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Izdaje</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:8px">
+            <input class="input" id="eTitle" placeholder="Naslov (npr. Jesen 2025)">
+            <input class="input" id="eMonth" type="number" min="1" max="12" placeholder="Mesec (1-12)">
+            <input class="input" id="eYear"  type="number" min="2000" max="2100" placeholder="Leto">
+            <input class="input" id="eFrom"  type="month" placeholder="Aktivno od (YYYY-MM)">
+            <input class="input" id="eTo"    type="month" placeholder="Aktivno do (YYYY-MM)">
+            <input class="input" id="eDesc"  placeholder="Kratek opis">
+            <button class="btn ok" id="addEdition">+ Ustvari izdajo</button>
+          </div>
+          <div id="edList" class="card" style="padding:8px"></div>
+        </div>
+
+        <!-- Članki -->
+        <div class="glass" style="flex:1;min-width:360px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Članki</h3>
+          <div id="admArts"></div>
+        </div>
+
+        <!-- Radio: skladbe (MP3 upload) -->
+        <div class="glass" style="flex:1;min-width:360px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Radio – Skladbe (MP3)</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <input class="input" id="rTitle" placeholder="Naslov skladbe">
+            <input class="input" id="rDur" type="number" min="10" max="1200" value="180" placeholder="Trajanje (s)" style="max-width:140px">
+            <input class="input" id="rFile" type="file" accept="audio/mpeg,audio/mp3" style="max-width:280px; padding:8px; background:#fff; color:#111">
+            <button class="btn" id="addTrack">Dodaj</button>
+          </div>
+
+          <!-- Progress za MP3 upload -->
+          <div id="upWrap" style="height:8px;background:#eee;border-radius:6px;overflow:hidden;margin-top:6px;display:none">
+            <div id="upBar" style="height:100%;width:0%;background:#24c1ff;transition:width .15s linear"></div>
+          </div>
+          <div id="upTxt" style="font-size:12px;color:#234;margin-top:6px;display:none">Pripravljeno…</div>
+
+          <div id="tracks" class="card" style="padding:8px;margin-top:8px"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <input class="input" id="repeat" type="number" min="1" value="1" style="max-width:120px">
+            <button class="btn ok" id="publish">Objavi urnik</button>
+          </div>
+        </div>
+
+        <!-- Radio: obvestila -->
+        <div class="glass" style="flex:1;min-width:360px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Radio – Obvestila</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <input class="input" id="nTitle" placeholder="Naslov obvestila">
+            <input class="input" id="nDate" type="date" style="max-width:180px">
+            <textarea class="ta" id="nText" placeholder="Vsebina..." style="height:80px"></textarea>
+            <button class="btn" id="addNotice">Dodaj</button>
+          </div>
+          <div id="notices" class="card" style="padding:8px"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+
+  /* ============ IZDAJE ============ */
+  const edList = document.getElementById('edList');
+  document.getElementById('addEdition').onclick = async ()=>{
+    const title = eTitle.value.trim();
+    const month = parseInt(eMonth.value||'0',10);
+    const year  = parseInt(eYear.value||'0',10);
+    const activeFrom = eFrom.value || '';
+    const activeTo   = eTo.value || '';
+    const desc = eDesc.value.trim();
+    if(!month || !year){ alert('Mesec in leto sta obvezna.'); return; }
+    try{
+      await addDoc(collection(db,'editions'),{
+        title, month, year, activeFrom, activeTo, desc,
+        published: true, created: serverTimestamp(), updated: serverTimestamp()
+      });
+      eTitle.value=eMonth.value=eYear.value=eFrom.value=eTo.value=eDesc.value='';
+    }catch(e){ alert('Napaka pri ustvarjanju izdaje: '+e.message); }
+  };
+
+  const unsubEditions = onSnapshot(
+    query(collection(db,'editions'), orderBy('year','desc'), orderBy('month','desc')),
+    (snap)=>{
+      edList.innerHTML='';
+      snap.forEach(ed=>{
+        const e=ed.data();
+        const row=document.createElement('div');
+        row.className='glass';
+        row.style.cssText='padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+        const title = e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
+        row.innerHTML = `
+          <b>${title}</b> ${e.published?'<span class="badge ok">OBJAVLJENO</span>':'<span class="badge wait">SKRITO</span>'}
+          <div style="color:#456">${e.desc||''}</div>
+          <div style="font-size:12px;color:#567">${String(e.month).padStart(2,'0')}/${e.year} · ${e.activeFrom||''} – ${e.activeTo||''}</div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn" data-act="toggle">${e.published?'Skrij':'Objavi'}</button>
+            <button class="btn" data-act="edit">Uredi</button>
+            <button class="btn bad" data-act="del">Izbriši</button>
+          </div>
+        `;
+        row.querySelector('[data-act="toggle"]').onclick = async ()=>{
+          try{ await updateDoc(doc(db,'editions',ed.id), { published: !e.published, updated: serverTimestamp() }); }
+          catch(err){ alert('Napaka: '+err.message); }
+        };
+        row.querySelector('[data-act="edit"]').onclick = async ()=>{
+          const nt = (prompt('Nov naslov (pusti prazno za brez spremembe):', e.title||'') ?? (e.title||''));
+          const nm = parseInt(prompt('Mesec (1-12):', String(e.month))||String(e.month),10)||e.month;
+          const ny = parseInt(prompt('Leto:', String(e.year))||String(e.year),10)||e.year;
+          try{ await updateDoc(doc(db,'editions',ed.id), { title:nt, month:nm, year:ny, updated: serverTimestamp() }); }
+          catch(err){ alert('Napaka: '+err.message); }
+        };
+        row.querySelector('[data-act="del"]').onclick = async ()=>{
+          if(!confirm('Res izbrišem izdajo? (Članki ostanejo, vendar brez dodeljene izdaje)')) return;
+          try{ await deleteDoc(doc(db,'editions',ed.id)); }
+          catch(err){ alert('Napaka: '+err.message); }
+        };
+        edList.appendChild(row);
+      });
+    },
+    (err)=> edList.innerHTML = `<div class="glass" style="padding:8px;background:#fff;color:#0d1b2a">Napaka: ${err.message}</div>`
+  );
+
+  /* ============ ČLANKI ============ */
+  const admArts = document.getElementById('admArts');
+  const unsubArticles = onSnapshot(
+    query(collection(db, 'articles'), orderBy('created', 'desc')),
+    (snap) => {
+      admArts.innerHTML = '';
+      snap.forEach((s) => {
+        const d = s.data();
+        const row = document.createElement('div');
+        row.className = 'glass';
+        row.style.cssText = 'padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+        row.innerHTML = `
+          <b>${d.title}</b> ${badge(d.approved)} ${d.editionId?`<span class="badge" style="background:#eef">IZDAJA</span>`:''}
+          <div style="color:#456">${d.desc || ''}</div>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn ok"   data-act="approve">Objavi</button>
+            <button class="btn"      data-act="edit">Uredi</button>
+            <button class="btn warn" data-act="assign">Dodeli izdajo</button>
+            <button class="btn bad"  data-act="del">Izbriši</button>
+          </div>
+        `;
+        row.querySelector('[data-act="approve"]').onclick = async () => {
+          try { await updateDoc(doc(db, 'articles', s.id), { approved: true }); }
+          catch (e) { alert('Napaka pri objavi: ' + e.message); }
+        };
+        row.querySelector('[data-act="del"]').onclick = async () => {
+          if (!confirm('Res izbrišem članek?')) return;
+          try { await deleteDoc(doc(db, 'articles', s.id)); }
+          catch (e) { alert('Napaka pri brisanju: ' + e.message); }
+        };
+        row.querySelector('[data-act="edit"]').onclick = async () => {
+          try {
+            const snap = await getDoc(doc(db, 'articles', s.id));
+            window.navigate('editor', { id: s.id, ...snap.data() });
+          } catch (e) { alert('Napaka pri odpiranju: ' + e.message); }
+        };
+        row.querySelector('[data-act="assign"]').onclick = async ()=>{
+          const esnap = await getDocs(query(collection(db,'editions'), orderBy('year','desc'), orderBy('month','desc')));
+          if(esnap.empty){ alert('Najprej ustvari izdajo.'); return; }
+          let menu='Izberi indeks izdaje:\n';
+          const arr=[]; let i=1;
+          esnap.forEach(ed=>{
+            const e=ed.data();
+            const title=e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
+            arr.push({id:ed.id, title});
+            menu += `${i}. ${title}\n`; i++;
+          });
+          const pick = parseInt(prompt(menu,'1')||'1',10);
+          if(!pick || pick<1 || pick>arr.length) return;
+          try{ await updateDoc(doc(db,'articles',s.id), { editionId: arr[pick-1].id }); alert('Dodeljeno.'); }
+          catch(err){ alert('Napaka: '+err.message); }
+        };
+        admArts.appendChild(row);
+      });
+    },
+    (err)=> alert('Napaka pri branju člankov: '+err.message)
+  );
+
+  /* ============ RADIO – MP3 ============ */
+  const tracksEl = document.getElementById('tracks');
+  let order = [];
+  let tracks = [];
+  const stateRef = doc(db, 'radioState', 'scheduler');
+
+  document.getElementById('addTrack').onclick = async () => {
+    const btn   = document.getElementById('addTrack');
+    const fileI = document.getElementById('rFile');
+    const title = (document.getElementById('rTitle').value || '').trim();
+    const durIn = parseInt(document.getElementById('rDur').value || '180', 10);
+    const file  = fileI.files && fileI.files[0];
+
+    if (!title) { alert('Vnesi naslov skladbe.'); return; }
+    if (!file)  { alert('Izberi MP3 datoteko.'); return; }
+
+    btn.disabled = true;
+    const upWrap = document.getElementById('upWrap');
+    const upBar  = document.getElementById('upBar');
+    const upTxt  = document.getElementById('upTxt');
+    upWrap.style.display = 'block';
+    upTxt.style.display  = 'block';
+    upBar.style.width    = '0%';
+    upTxt.textContent    = 'Začenjam…';
+
+    try {
+      const metadata = { contentType: file.type || 'audio/mpeg' };
+      const path = `radioAudio/${Date.now()}_${file.name.replace(/\s+/g,'_')}`;
+      const ref  = sRef(st, path);
+      const uploadTask = uploadBytesResumable(ref, file, metadata);
+
+      await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+          (snap) => {
+            const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+            upBar.style.width = pct+'%';
+            upTxt.textContent = `Nalaganje: ${pct}% (${(snap.bytesTransferred/1024/1024).toFixed(2)}MB / ${(snap.totalBytes/1024/1024).toFixed(2)}MB)`;
+          },
+          (err) => reject(err),
+          () => resolve()
+        );
+      });
+
+      const url = await getDownloadURL(ref);
+
+      let durationSec = durIn;
+      try {
+        const probe = new Audio();
+        probe.src = url;
+        await new Promise((res, rej) => {
+          probe.addEventListener('loadedmetadata', () => res(), { once:true });
+          probe.addEventListener('error', () => rej(new Error('loadedmetadata error')), { once:true });
+        });
+        if (isFinite(probe.duration) && probe.duration > 0) {
+          durationSec = Math.round(probe.duration);
+        }
+      } catch {}
+
+      await addDoc(collection(db, 'radioTracks'), {
+        title, url, path,
+        durationSec: Math.max(10, Math.min(1200, durationSec)),
+        approved: true,
+        created: serverTimestamp()
+      });
+
+      upTxt.textContent = 'Končano ✔️';
+      alert('Skladba dodana.');
+      document.getElementById('rTitle').value = '';
+      document.getElementById('rDur').value   = '180';
+      fileI.value = '';
+
+    } catch (e) {
+      console.error('MP3 upload error', e);
+      upTxt.textContent = 'Napaka ❌';
+      const code = e?.code || '';
+      if (code === 'storage/unauthorized') {
+        alert('Nimaš dovoljenja za nalaganje v Storage. Preveri Storage Rules in da si prijavljen.');
+      } else {
+        alert('Napaka pri dodajanju skladbe: ' + (e?.message || e));
+      }
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => {
+        upWrap.style.display = 'none';
+        upTxt.style.display  = 'none';
+        upBar.style.width    = '0%';
+        upTxt.textContent    = '';
+      }, 800);
+    }
+  };
+
+  const unsubTracks = onSnapshot(
+    query(collection(db, 'radioTracks'), where('approved', '==', true)),
+    (snap) => {
+      tracks = snap.docs.map(d => {
+        const x = d.data();
+        const createdMs = x.created?.toMillis ? x.created.toMillis() : (x.created?.seconds ? x.created.seconds * 1000 : 0);
+        return { id: d.id, createdMs, ...x };
+      });
+      tracks.sort((a, b) => a.createdMs - b.createdMs);
+      renderTracks();
+    },
+    (err)=> alert('Napaka pri branju skladb: '+err.message)
+  );
+
+  const unsubState = onSnapshot(
+    stateRef,
+    (snap) => { order = snap.exists() ? (snap.data().order || []) : []; renderTracks(); },
+    (err)=> alert('Napaka pri branju urnika: '+err.message)
+  );
+
+  function renderTracks() {
+    const map = Object.fromEntries(tracks.map(t => [t.id, t]));
+    order = order.filter(id => map[id]);
+    tracks.forEach(t => { if (!order.includes(t.id)) order.push(t.id); });
+
+    tracksEl.innerHTML = '';
+    order.forEach((id, idx) => {
+      const t = map[id];
+      const row = document.createElement('div');
+      row.className = 'glass';
+      row.style.cssText = 'padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a;display:flex;align-items:center;gap:8px';
+      row.draggable = true; row.dataset.id = id;
+      row.innerHTML = `
+        <span style="width:28px;text-align:right;color:#777">${idx + 1}.</span>
+        <span style="flex:1">${t.title}</span>
+        <button class="btn"     data-act="dup">Podvoji</button>
+        <button class="btn"     data-act="ins">Vstavi po…</button>
+        <button class="btn bad" data-act="rm">Odstrani</button>
+      `;
+      row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', id); row.style.opacity = '.5'; });
+      row.addEventListener('dragend',   () => { row.style.opacity = '1'; });
+      row.addEventListener('dragover',  e => { e.preventDefault(); row.style.outline = '2px dashed #24c1ff'; });
+      row.addEventListener('dragleave', () => { row.style.outline = 'none'; });
+      row.addEventListener('drop',      e => {
+        e.preventDefault(); row.style.outline = 'none';
+        const dragId = e.dataTransfer.getData('text/plain'); if (dragId === id) return;
+        const from = order.indexOf(dragId), to = order.indexOf(id);
+        order.splice(from, 1); order.splice(to, 0, dragId);
+        renderTracks();
+      });
+      row.querySelector('[data-act="dup"]').onclick = () => { const pos = order.indexOf(id); order.splice(pos + 1, 0, id); renderTracks(); };
+      row.querySelector('[data-act="ins"]').onclick = () => {
+        const after = parseInt(prompt(`Vstavi po katerem mestu? (1…${order.length})`, String(idx + 1)) || String(idx + 1), 10);
+        const pos = Math.max(1, Math.min(order.length, after));
+        order.splice(pos, 0, id); renderTracks();
+      };
+      row.querySelector('[data-act="rm"]').onclick = () => { order = order.filter(x => x !== id); renderTracks(); };
+      tracksEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('publish').onclick = async () => {
+    try {
+      const repeat = Math.max(1, parseInt(document.getElementById('repeat').value || '1', 10));
+      await setDoc(stateRef, {
+        order,
+        repeatPerDay: repeat,
+        baseStartAt: serverTimestamp(),
+        playing: true,
+        dayKey: new Date().toISOString().slice(0, 10)
+      }, { merge: true });
+      alert('Urnik objavljen.');
+    } catch (e) { alert('Napaka pri objavi urnika: ' + e.message); }
+  };
+
+  /* ============ RADIO – obvestila ============ */
+  const noticesEl = document.getElementById('notices');
+  document.getElementById('addNotice').onclick = async () => {
+    const title = nTitle.value.trim() || 'Obvestilo';
+    const text  = nText.value.trim();
+    const dateISO = nDate.value || null;
+    if (!text) return alert('Vsebina obvestila je prazna.');
+    try {
+      await addDoc(collection(db, 'radioAnnouncements'), {
+        title, text, dateISO,
+        approved: false, created: serverTimestamp(),
+        by: auth.currentUser.email
+      });
+      nTitle.value = ''; nText.value = ''; nDate.value = '';
+    } catch (e) { alert('Napaka pri dodajanju obvestila: ' + e.message); }
+  };
+
+  const unsubNotices = onSnapshot(
+    query(collection(db, 'radioAnnouncements'), orderBy('created', 'desc')),
+    (snap) => {
+      noticesEl.innerHTML = '';
+      snap.forEach((s) => {
+        const d = s.data();
+        const row = document.createElement('div');
+        row.className = 'glass';
+        row.style.cssText = 'padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+        row.innerHTML = `
+          <b>${d.title}</b> ${badge(d.approved)}
+          <div style="color:#456">${(d.text || '').slice(0, 140)}${(d.text || '').length > 140 ? '…' : ''}</div>
+          <div style="font-size:12px;color:#567">${d.dateISO || ''}</div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn ok"  data-id="${s.id}" data-act="ap">Objavi</button>
+            <button class="btn"     data-id="${s.id}" data-act="ed">Uredi</button>
+            <button class="btn bad" data-id="${s.id}" data-act="rm">Izbriši</button>
+          </div>
+        `;
+        row.querySelector('[data-act="ap"]').onclick = async () => {
+          try { await updateDoc(doc(db, 'radioAnnouncements', s.id), { approved: true }); }
+          catch (e) { alert('Napaka pri objavi obvestila: ' + e.message); }
+        };
+        row.querySelector('[data-act="rm"]').onclick = async () => {
+          if (!confirm('Res izbrišem obvestilo?')) return;
+          try { await deleteDoc(doc(db, 'radioAnnouncements', s.id)); }
+          catch (e) { alert('Napaka pri brisanju obvestila: ' + e.message); }
+        };
+        row.querySelector('[data-act="ed"]').onclick = async () => {
+          const nt = prompt('Novo besedilo obvestila:', d.text || '');
+          if (nt == null) return;
+          try { await updateDoc(doc(db, 'radioAnnouncements', s.id), { text: nt }); }
+          catch (e) { alert('Napaka pri urejanju obvestila: ' + e.message); }
+        };
+        noticesEl.appendChild(row);
+      });
+    },
+    (err)=> alert('Napaka pri branju obvestil: '+err.message)
+  );
+
+  const cleanup = ()=>{ try{unsubArticles();}catch{} try{unsubTracks();}catch{} try{unsubState();}catch{} try{unsubNotices();}catch{} try{unsubEditions();}catch{} };
+  window.addEventListener('popstate', cleanup, { once:true });
+};
+
+/* ============================================================
+   RADIO stran (uporabnik): spored + obvestila
+============================================================ */
+window.openRadio = function(){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">📻 Šolski radio</div>
+      <button class="btn ghost" id="backBtn">Nazaj</button>
+    </div>
+    <div class="wrap" style="padding:0">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div class="glass" style="flex:1;min-width:320px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Obvestila</h3>
+          <div id="noticeList"></div>
+        </div>
+        <div class="glass" style="flex:1;min-width:360px;padding:12px">
+          <h3 style="margin:0 0 8px 0">Spored</h3>
+          <div id="queue"></div>
+          <div style="margin-top:8px;color:#cfe7ff">Predvajanje: okrogel gumb spodaj desno (play/pause).</div>
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+  const qEl=document.getElementById('queue');
+  const nEl=document.getElementById('noticeList');
+
+  (async()=>{
+    const stDoc=await getDoc(doc(db,'radioState','scheduler'));
+    if(!stDoc.exists()) qEl.innerHTML='<i>Urnik še ni objavljen.</i>';
+    else{
+      let ord=[...(stDoc.data().order||[])];
+      qEl.innerHTML='';
+      for(let i=0;i<ord.length;i+=10){
+        const part=ord.slice(i,i+10);
+        const snap=await getDocs(query(collection(db,'radioTracks'), where(documentId(),'in',part)));
+        const byId={}; snap.forEach(d=>byId[d.id]=d.data());
+        part.forEach(id=>{
+          const t=byId[id]; if(!t) return;
+          const row=document.createElement('div');
+          row.className='glass'; row.style.cssText='padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+          row.textContent=t.title||'Skladba'; qEl.appendChild(row);
+        });
+      }
+    }
+  })();
+
+  onSnapshot(query(collection(db,'radioAnnouncements'), where('approved','==',true), orderBy('created','desc')), (snap)=>{
+    nEl.innerHTML=''; snap.forEach(s=>{
+      const d=s.data(); const box=document.createElement('div'); box.className='glass';
+      box.style.cssText='padding:8px 10px;margin:6px 0;background:#fff;color:#0d1b2a';
+      box.innerHTML = `<b>${d.title}</b> <small style="color:#567">${d.dateISO||''}</small><br>${(d.text||'').replace(/\n/g,'<br>')}`;
+      nEl.appendChild(box);
+    });
+  });
+};
+
+/* ---------------- App init ---------------- */
+function enterApp(){
+  authBox.style.display='none';
+  navBar.style.display='flex';
+  navigate('home',{},false);
+}
+onAuthStateChanged(auth, async (u)=>{
+  if(u){ authBox.style.display='none'; navBar.style.display='flex'; await refreshAdminButton(); navigate('home',{},false); }
+  else { navBar.style.display='none'; authBox.style.display='block'; stage.innerHTML=''; }
+});
+
+if(location.hash.startsWith('#issue-')){ const id=location.hash.split('-')[1]; navigate('issue',{id}); }
+else if(location.hash==='#chat') window.openChat();
+else if(location.hash==='#radio') window.openRadio();
+else if(location.hash==='#profile') window.openProfile();
+else if(location.hash==='#admin') window.openAdmin();
+else window.openEditions();
+</script>
+</body>
+</html>
