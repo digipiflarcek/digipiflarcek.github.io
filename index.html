@@ -87,17 +87,14 @@ header{
 .hoverPrev{ transform:translateY(150px); transition:transform .2s ease; padding:10px 12px; border-top:1px solid rgba(0,0,0,.06); background:#fff; color:#111 }
 .article:hover .hoverPrev{ transform:translateY(0) }
 
-/* Paper view (A4 style) */
-.paper{
-  background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:16px; line-height:1.8;
-  box-shadow:0 10px 20px rgba(0,0,0,.15);
-}
+/* Paper view */
 .viewer-wrap{ display:flex; justify-content:center; }
 .viewer-a4{
   width:210mm; min-height:297mm; background:#fff; color:#111;
   border:1px solid rgba(0,0,0,.1); border-radius:8px; padding:20mm; line-height:1.7;
   box-shadow:0 16px 32px rgba(0,0,0,.25);
   background-image: radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px); background-size:6px 6px;
+  position: relative; /* za sidranje .movable */
 }
 
 /* A4 Editor */
@@ -124,18 +121,58 @@ header{
 .meta-box .meta-title{ width:100%; padding:10px; border-radius:8px; border:1px solid #cfe1ff; background:#fff; font-size:20px; font-weight:800; color:#163a66 }
 .meta-box .meta-desc{ width:100%; height:64px; margin-top:6px; padding:10px; border-radius:8px; border:1px solid #cfe1ff; background:#fff; color:#163a66 }
 
+/* === A4 več listov + plavajoče slike === */
+.pages{ display:flex; flex-direction:column; align-items:center; gap:24px; padding-bottom:40px; }
+.page{
+  width:210mm; min-height:297mm; background:#fff; color:#111;
+  border:1px solid rgba(0,0,0,.1); border-radius:8px; padding:20mm; line-height:1.7;
+  box-shadow:0 16px 32px rgba(0,0,0,.25);
+  background-image: radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px); background-size:6px 6px;
+  transform-origin: top center; position:relative; overflow:hidden;
+}
+.page[contenteditable="true"]{ outline:none; }
+/* prepreči prelitje vsebine iz strani */
+.page *{ max-width:100%; box-sizing:border-box; word-wrap:break-word; overflow-wrap:anywhere; }
+.page img{ max-width:100%; height:auto; }
+.page table{ width:100% !important; table-layout:fixed; border-collapse:collapse; }
+.page td,.page th{ word-break:break-word; }
+
+/* plavajoče slike */
+.movable{ position:absolute; user-select:none; touch-action:none; cursor:move; z-index:1; max-width:100%; }
+.movable.selected{ z-index:999; }
+.movable img{ display:block; max-width:none; max-height:none; }
+.movable .handle{
+  position:absolute; width:12px; height:12px; border:2px solid #fff;
+  background:#24c1ff; border-radius:2px; display:none;
+}
+.movable.selected .handle{ display:block; }
+.movable .h-nw{ left:-6px; top:-6px; cursor:nwse-resize; }
+.movable .h-ne{ right:-6px; top:-6px; cursor:nesw-resize; }
+.movable .h-se{ right:-6px; bottom:-6px; cursor:nwse-resize; }
+.movable .h-sw{ left:-6px; bottom:-6px; cursor:nesw-resize; }
+
+/* pager v ogledu */
+.viewerPager{ display:flex; justify-content:center; gap:8px; margin-top:8px }
+.viewerBtn{ background:#e6f1ff; color:#102a43; border:1px solid #cfe1ff; padding:6px 10px; border-radius:10px; cursor:pointer; }
+.viewerBtn:disabled{ opacity:.5; cursor:default }
 /* Chat */
 #chatBox{ height:420px; overflow:auto }
 .chatRow{ background:rgba(36,193,255,.12); color:#073b59; padding:8px 10px; margin:6px 0; border-radius:12px }
 
-/* Admin */
-.badge{ padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(0,0,0,.08) }
-.badge.ok{ background:#eafff5; color:#064 }
-.badge.wait{ background:#fff6e5; color:#6a4300 }
+.movable img { pointer-events: none; }
+.movable.selected img { pointer-events: auto; }
 
-/* Sticky radio button */
+/* ==== Modal (za @glas) ==== */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:10000}
+.modal .box{background:#fff;color:#0d1b2a;border-radius:12px;padding:16px;width:min(520px,90vw);box-shadow:var(--shadow)}
+.modal .row{margin:6px 0}
+.modal .row label{display:block;font-weight:700;margin-bottom:4px}
+.modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.modal .box input,.modal .box textarea,.modal .box select{width:100%;padding:10px;border-radius:10px;border:1px solid #cfe1ff;background:#f8fbff;color:#0d1b2a}
+.modal .box textarea{min-height:100px}
+/* Sticky radio (top-right) */
 #radioSticky{
-  position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%;
+  position:fixed; top:18px; right:18px; width:56px; height:56px; border-radius:50%;
   background:rgba(255,255,255,.22); border:1px solid rgba(255,255,255,.45); backdrop-filter: blur(10px);
   display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:9999;
   box-shadow:0 8px 24px rgba(0,0,0,.35); transition:.18s;
@@ -143,23 +180,21 @@ header{
 }
 #radioSticky:hover{ transform:scale(1.06); background:rgba(255,255,255,.3) }
 #radioTooltip{
-  position:fixed; right:86px; bottom:36px; padding:6px 10px; border-radius:10px; background:rgba(255,255,255,.98);
+  position:fixed; right:86px; top:26px; padding:6px 10px; border-radius:10px; background:rgba(255,255,255,.98);
   color:#111; border:1px solid rgba(0,0,0,.08); box-shadow:0 10px 24px rgba(0,0,0,.25); display:none; z-index:9999;
+}
+/* (opcijsko) stil za sistemska sporočila v chatu */
+.chatRow.system {
+  background: rgba(0,0,0,.08);
+  color:#0b1f2a;
+  border:1px dashed rgba(0,0,0,.2);
 }
 
 /* Print */
 @media print{
   header,.subbar,.tool-left,.tool-right,#radioSticky,#radioTooltip{ display:none !important }
   body{ background:#fff }
-  .a4,.viewer-a4{ box-shadow:none; border:none }
-}
-
-/* Slike v A4 */
-.a4 img{
-  max-width:100%;
-  height:auto;
-  display:block;
-  margin:8px 0;
+  .page,.viewer-a4{ box-shadow:none; border:none }
 }
 </style>
 </head>
@@ -225,7 +260,6 @@ header{
 <!-- Sticky radio -->
 <div id="radioSticky">▶️</div>
 <div id="radioTooltip"></div>
-<!-- Skrit HTML5 avdio predvajalnik -->
 <audio id="radioAudio" preload="auto"></audio>
 
 <!-- ============== JS – celoten app ============== -->
@@ -243,7 +277,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBQaD0MGnuMa45hm_99VvOwNsTdCoFPgNI",
   authDomain: "school-12a1f.firebaseapp.com",
   projectId: "school-12a1f",
-  storageBucket: "school-12a1f.appspot.com",
+  storageBucket: "school-12a1f.firebasestorage.app",
   messagingSenderId: "539327102547",
   appId: "1:539327102547:web:bd2571f5d327faafaed0a6",
   measurementId: "G-GBG9YCLE12"
@@ -323,6 +357,64 @@ async function refreshAdminButton(){
   if(u.exists() && u.data().role==='admin') btn.style.display='inline-block';
 }
 
+// ====== Pomočniki za glasovanje (@glas) ======
+const pollRef = doc(db, 'polls', 'active');
+
+async function isAdminUser(){
+  if(!auth.currentUser) return false;
+  try{
+    const u = await getDoc(doc(db,'users',auth.currentUser.uid));
+    return u.exists() && u.data().role === 'admin';
+  }catch{
+    return false;
+  }
+}
+
+function sysChat(text){
+  // Sistemsko sporočilo v chat (za faze in rezultate glasovanja)
+  return addDoc(collection(db,'chat'), {
+    system: true,
+    type: 'poll',
+    text,
+    time: serverTimestamp()
+  });
+}
+
+function normalize(s){ return (s||'').trim(); }
+
+/* =====================  NOVI HELPERJI ZA PORAVNAVO .movable  ===================== */
+// Pretvori data-% -> px glede na širino strani (.page)
+function applyPercentPositions(container){
+  if(!container) return;
+  const page = container.classList.contains('page') ? container : container.querySelector('.page') || container;
+  const pw = page.clientWidth || 1;
+  page.querySelectorAll('.movable').forEach(el=>{
+    const lp = parseFloat(el.dataset.leftPct||el.getAttribute('data-left-pct')||'');
+    const tp = parseFloat(el.dataset.topPct ||el.getAttribute('data-top-pct') ||'');
+    const wp = parseFloat(el.dataset.widthPct||el.getAttribute('data-width-pct')||'');
+    if(Number.isFinite(lp)) el.style.left  = (lp/100*pw) + 'px';
+    if(Number.isFinite(tp)) el.style.top   = (tp/100*pw) + 'px';
+    if(Number.isFinite(wp)) el.style.width = (wp/100*pw) + 'px';
+    el.style.position = 'absolute';
+  });
+}
+// Shrani iz ene .page HTML, pri čemer .movable pozicije prepišemo v data-% in očistimo px stile
+function serializePageHTML(pageEl){
+  const clone = pageEl.cloneNode(true);
+  const pw = pageEl.clientWidth || 1;
+  clone.querySelectorAll('.movable').forEach(el=>{
+    const left = parseFloat(el.style.left||'0');
+    const top  = parseFloat(el.style.top||'0');
+    const width= parseFloat(el.style.width||el.getBoundingClientRect().width||'0');
+    el.setAttribute('data-left-pct',  ((left / pw)  * 100).toFixed(3));
+    el.setAttribute('data-top-pct',   ((top  / pw)  * 100).toFixed(3));
+    el.setAttribute('data-width-pct', ((width/ pw)  * 100).toFixed(3));
+    el.style.left = ''; el.style.top = ''; el.style.width = '';
+  });
+  return clone.innerHTML;
+}
+/* ================================================================================ */
+
 /* ---------------- Chat ---------------- */
 const chatCol = collection(db,'chat');
 window.openChat = function(){
@@ -343,29 +435,172 @@ window.openChat = function(){
   const box = document.getElementById('chatBox');
   const q   = query(chatCol, orderBy('time','asc'));
   onSnapshot(q, snap=>{
-    box.innerHTML='';
-    snap.forEach(d=>{
-      const x=d.data();
-      const div=document.createElement('div');
+  box.innerHTML='';
+  snap.forEach(d=>{
+    const x=d.data();
+    const div=document.createElement('div');
+    if(x.system){
+      div.className='chatRow';
+      div.style.background='rgba(0,0,0,.08)';
+      div.style.color='#0b1f2a';
+      div.style.border='1px dashed rgba(0,0,0,.2)';
+      div.innerHTML = `<span style="font-weight:800">🛎️ Sistem</span><br>${(x.text||'').replace(/\n/g,'<br>')}`;
+    }else{
       div.className='chatRow';
       div.innerHTML = `<span style="font-weight:800">${x.userName||'Gost'}</span><br>${x.text}`;
-      box.appendChild(div);
-    });
-    box.scrollTop=box.scrollHeight;
-  });
-  document.getElementById('chatSend').onclick = async ()=>{
-    const text = chatText.value.trim(); if(!text) return;
-    let userName='Gost';
-    if(auth.currentUser){
-      const u = await getDoc(doc(db,'users',auth.currentUser.uid));
-      if(u.exists()) userName = `${u.data().name||''} ${u.data().surname||''}`.trim() || 'Uporabnik';
     }
-    await addDoc(chatCol,{ userName, text, time: serverTimestamp() });
+    box.appendChild(div);
+  });
+  box.scrollTop=box.scrollHeight;
+});
+
+ document.getElementById('chatSend').onclick = async ()=>{
+  const raw = chatText.value || '';
+  const text = raw.trim();
+  if(!text) return;
+
+  if(text.toLowerCase().startsWith('@glas')){
+    await handlePollCommand(text);
     chatText.value='';
-  };
+    return;
+  }
+
+  let userName='Gost';
+  if(auth.currentUser){
+    const u = await getDoc(doc(db,'users',auth.currentUser.uid));
+    if(u.exists()) userName = `${u.data().name||''} ${u.data().surname||''}`.trim() || 'Uporabnik';
+  }
+  await addDoc(chatCol,{ userName, text, time: serverTimestamp() });
+  chatText.value='';
+};
+async function handlePollCommand(cmdRaw){
+  const cmd = cmdRaw.trim().toLowerCase();
+  const admin = await isAdminUser();
+  const snap = await getDoc(pollRef);
+  const hasActive = snap.exists();
+  const me = auth.currentUser;
+
+  if(!hasActive){
+    if(!admin){
+      alert('Ni aktivnega glasovanja.');
+      return;
+    }
+    if(cmd === '@glas'){
+      const title = prompt('Naslov glasovanja:');
+      if(!title) return;
+      const nStr = prompt('Koliko TOP zmagovalcev (npr. 3):','1');
+      const topN = Math.max(1, parseInt(nStr||'1',10));
+      await setDoc(pollRef, {
+        title: normalize(title),
+        topN,
+        phase: 'propose',
+        proposals: [],
+        created: serverTimestamp(),
+        createdBy: me?.uid || 'anon'
+      });
+      await sysChat(`Začeli smo glasovanje: “${title}”. Faza: PREDLOGI.\nVsak lahko vpiše @glas in odda svoj predlog.`);
+      return;
+    }else{
+      alert('Ni aktivnega glasovanja.');
+      return;
+    }
+  }
+
+  const poll = snap.data() || {};
+  const phase = poll.phase || 'propose';
+  const title = poll.title || 'Glasovanje';
+  const topN  = poll.topN || 1;
+  const proposals = Array.isArray(poll.proposals)? [...poll.proposals] : [];
+
+  const votesCol = collection(db,'polls','active','votes');
+  const uid = me?.uid || ('guest-'+Math.random().toString(36).slice(2));
+
+  if(phase === 'propose'){
+    if(admin && cmd === '@glas start'){
+      await updateDoc(pollRef, { phase: 'vote' });
+      await sysChat(`Glasovanje “${title}” — preklop v fazo GLASOVANJE.\nVtipkaj @glas in izberi enega od predlogov.`);
+      return;
+    }
+    if(cmd.startsWith('@glas')){
+      const pText = prompt(`Predlog za: “${title}”`);
+      const text = normalize(pText);
+      if(!text) return;
+
+      const exists = proposals.some(p => (p.text||'').toLowerCase() === text.toLowerCase());
+      if(exists){ alert('Ta predlog že obstaja.'); return; }
+
+      const item = {
+        id: crypto.randomUUID ? crypto.randomUUID() : ('p_'+Date.now()+'_'+Math.random().toString(36).slice(2)),
+        text,
+        by: uid,
+        ts: Date.now(),
+        count: 0
+      };
+      proposals.push(item);
+      await updateDoc(pollRef, { proposals });
+      await sysChat(`Dodani predlog: “${text}”`);
+      return;
+    }
+    return;
+  }
+
+  if(phase === 'vote'){
+    if(admin && cmd === '@glas end'){
+      const pros = (Array.isArray(proposals)? proposals: []).slice().sort((a,b)=>(b.count||0)-(a.count||0));
+      const winners = pros.slice(0, topN);
+      await updateDoc(pollRef, { phase:'ended', winners });
+      const lines = winners.map((w,i)=> `${i+1}. ${w.text} — ${w.count||0} glasov`);
+      await sysChat(`Glasovanje “${title}” je KONČANO.\nZmagovalci:\n${lines.join('\n')}`);
+      return;
+    }
+
+    if(cmd === '@glas'){
+      if(!proposals.length){ alert('Ni predlogov.'); return; }
+      const menu = proposals.map((p,i)=> `${i+1}. ${p.text} (${p.count||0})`).join('\n');
+      const pickStr = prompt(`“${title}” — izberi številko predloga:\n${menu}`, '1');
+      if(!pickStr) return;
+      const idx = Math.max(1, Math.min(proposals.length, parseInt(pickStr,10)||1)) - 1;
+      const choice = proposals[idx];
+
+      const myVoteRef = doc(votesCol, uid);
+      const myVoteSnap = await getDoc(myVoteRef);
+      let prevId = null;
+      if(myVoteSnap.exists()) prevId = myVoteSnap.data().proposalId;
+
+      const next = proposals.map(p=>({...p}));
+      if(prevId){
+        const pi = next.findIndex(p=>p.id===prevId);
+        if(pi>=0) next[pi].count = Math.max(0, (next[pi].count||0)-1);
+      }
+      const ni = next.findIndex(p=>p.id===choice.id);
+      if(ni>=0) next[ni].count = (next[ni].count||0)+1;
+
+      await Promise.all([
+        updateDoc(pollRef, { proposals: next }),
+        setDoc(myVoteRef, { proposalId: choice.id, at: serverTimestamp() })
+      ]);
+
+      alert('Glas zabeležen.');
+      return;
+    }
+    return;
+  }
+
+  if(phase === 'ended'){
+    if(cmd === '@glas'){
+      const winners = Array.isArray(poll.winners)? poll.winners : [];
+      if(!winners.length){ alert('Glasovanje zaključeno. Ni rezultatov.'); return; }
+      const lines = winners.map((w,i)=> `${i+1}. ${w.text} — ${w.count||0} glasov`).join('\n');
+      alert(`Rezultati “${title}”:\n${lines}`);
+      return;
+    }
+    return;
+  }
 }
 
-/* ---------------- Sticky radio – playback ---------------- */
+}
+
+/* ---------------- Radio (playback) ---------------- */
 const radioBtn = document.getElementById('radioSticky');
 const tip      = document.getElementById('radioTooltip');
 const audioEl  = document.getElementById('radioAudio');
@@ -400,13 +635,10 @@ async function loadSchedule(){
     const tracks = [];
     for(let i=0;i<ord.length;i+=10){
       const chunk = ord.slice(i,i+10);
-      if(chunk.length===0) continue;
       const snap  = await getDocs(query(collection(db,'radioTracks'), where(documentId(),'in', chunk)));
-      const byId  = {};
-      snap.forEach(d=> byId[d.id] = d.data());
+      const byId  = {}; snap.forEach(d=> byId[d.id] = d.data());
       chunk.forEach(id=>{
-        const t = byId[id];
-        if(!t) return;
+        const t = byId[id]; if(!t) return;
         const dur = Number.isFinite(+t.durationSec) ? Math.max(10, parseInt(t.durationSec,10)) : 180;
         const url = (t.url||'').trim();
         if(!url) return;
@@ -492,7 +724,6 @@ document.getElementById('navRadio').onclick    = ()=>navigate('radio');
 document.getElementById('navProfile').onclick  = ()=>navigate('profile');
 document.getElementById('navAdmin').onclick    = ()=>navigate('admin');
 
-/* Helper: username → email */
 window.lookupUserByUsername = async (username)=>{
   try{
     const d = await getDoc(doc(db,'usernames',username));
@@ -500,7 +731,6 @@ window.lookupUserByUsername = async (username)=>{
   }catch{return null}
 };
 
-/* --------- Pomožne --------- */
 function badge(ok){ return `<span class="badge ${ok?'ok':'wait'}">${ok?'OBJAVLJENO':'ČAKALNICA'}</span>`; }
 
 /* ============================================================
@@ -612,7 +842,7 @@ window.openIssue = function(iss){
 };
 
 /* ============================================================
-   OGLED članka – A4 VIEWER (brez urejevanja)
+   OGLED članka – A4 VIEWER (paging)
 ============================================================ */
 window.openArticleView = function(d){
   stage.innerHTML = `
@@ -627,17 +857,45 @@ window.openArticleView = function(d){
       </div>
       ${d.img? `<img src="${d.img}" style="max-width:100%;border-radius:12px;margin:8px 0">`:''}
       <div class="viewer-wrap">
-        <div class="viewer-a4">
-          ${d.content||''}
-        </div>
+        <div class="viewer-a4" id="viewA4"></div>
+      </div>
+      <div class="viewerPager">
+        <button class="viewerBtn" id="prevPg">‹ Prejšnja</button>
+        <span id="pgInfo" style="align-self:center;color:#102a43"></span>
+        <button class="viewerBtn" id="nextPg">Naslednja ›</button>
       </div>
     </div>
   `;
   backify();
+  const parts = String(d.content||'').split('<!--PAGE_BREAK-->');
+  let pg = 0;
+  const view = document.getElementById('viewA4');
+  const prev = document.getElementById('prevPg');
+  const next = document.getElementById('nextPg');
+  const info = document.getElementById('pgInfo');
+  function renderPg(){
+    view.innerHTML = `<div class="page" style="box-shadow:none;border:none;">${parts[pg] || ''}</div>`;
+    // *** Ključ: pretvori shranjene data-% v px ***
+    applyPercentPositions(view.firstElementChild);
+
+    info.textContent = `Stran ${pg+1} / ${parts.length}`;
+    prev.disabled = pg===0;
+    next.disabled = pg===parts.length-1;
+  }
+  prev.onclick = ()=>{ if(pg>0){ pg--; renderPg(); } };
+  next.onclick = ()=>{ if(pg<parts.length-1){ pg++; renderPg(); } };
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowLeft') prev.click();
+    if(e.key==='ArrowRight') next.click();
+  });
+  renderPg();
+
+  // ob resize-u preracunaj pozicije
+  window.addEventListener('resize', ()=> applyPercentPositions(view.firstElementChild));
 };
 
 /* ============================================================
-   A4 UREJEVALNIK – z lokalnim uploadom slik (brez CORS)
+   A4 UREJEVALNIK – več listov + plavajoče slike
 ============================================================ */
 window.openEditor = function(existing=null){
   stage.innerHTML = `
@@ -677,7 +935,7 @@ window.openEditor = function(existing=null){
         <button class="btn" data-cmd="indent">↦</button>
       </div>
 
-      <!-- list -->
+      <!-- listi -->
       <div class="a4-wrap">
         <div style="max-width:210mm;width:100%;">
           <div class="meta-box">
@@ -689,17 +947,17 @@ window.openEditor = function(existing=null){
               <small style="color:#456">(izberi številko izdaje)</small>
             </div>
           </div>
-          <div id="paper" class="a4" contenteditable="true"><p>Začni pisati svoj članek tukaj…</p></div>
-          <div style="text-align:center;color:#7a8aa0;margin:8px 0">Stran 1</div>
 
-          <!-- naslovna slika -->
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <label>Naslovna slika:</label>
+          <div id="pages" class="pages"></div>
+          <div style="text-align:center;color:#7a8aa0;margin:8px 0"><span id="pageCounter">Stran 1</span></div>
+
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <label>Naslovna slika: </label>
             <input id="imgUpload" type="file" accept="image/*" class="input" style="max-width:320px">
-            <span id="imgHeroInfo" style="font-size:12px;color:#cfe7ff"></span>
+            <span id="imgHeroInfo" style="color:#163a66;font-size:12px"></span>
           </div>
 
-          <!-- skriti input za "🖼️" gumb (vstavi sliko v vsebino) + progress -->
+          <!-- skriti input za inline sliko + progress -->
           <input id="inlineImgInput" type="file" accept="image/*" style="display:none">
           <div id="imgUpWrap" style="height:6px;background:#eee;border-radius:6px;overflow:hidden;margin-top:6px;display:none">
             <div id="imgUpBar" style="height:100%;width:0%;background:#24c1ff;transition:width .15s linear"></div>
@@ -712,6 +970,7 @@ window.openEditor = function(existing=null){
       <div class="tool-right">
         <button class="btn" id="sup">x²</button>
         <button class="btn" id="sub">x₂</button>
+        <button class="btn" id="addPageBtn">➕ Stran</button>
         <button class="btn" id="linkBtn">🔗</button>
         <button class="btn" id="imgBtn">🖼️</button>
         <button class="btn" id="tableBtn">▦</button>
@@ -732,29 +991,72 @@ window.openEditor = function(existing=null){
   `;
   backify();
 
-  // napolni izdajni select
+  /* --- napolni izdaje --- */
   const sel = document.getElementById('editionSelect');
   sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
   onSnapshot(
-    query(collection(db,'editions'), where('published','==',true), orderBy('year','desc'), orderBy('month','desc')),(snap)=>{
+    query(collection(db,'editions'), where('published','==',true), orderBy('year','desc'), orderBy('month','desc')),
+    (snap)=>{
       sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
       snap.forEach(ed=>{
         const e=ed.data();
         const title = e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
         const opt = document.createElement('option');
-        opt.value = ed.id;
-        opt.textContent = `${title}`;
+        opt.value = ed.id; opt.textContent = title;
         sel.appendChild(opt);
       });
       if(existing?.editionId) sel.value = existing.editionId;
     }
   );
 
-  // komande
+  /* --- helperji za strani --- */
+  const pagesWrap = document.getElementById('pages');
+  const pageCounter = document.getElementById('pageCounter');
+
+  function updateCounter(){ pageCounter.textContent = `Strani: ${pagesWrap.children.length}`; }
+
+  function createPage(html=''){
+    const pg = document.createElement('div');
+    pg.className='page';
+    pg.contentEditable='true';
+    pg.innerHTML = html || '<p>Začni pisati svoj članek tukaj…</p>';
+    pg.addEventListener('focus', ()=>{ currentPage = pg; });
+    pg.addEventListener('mousedown', (e)=>{ if(e.target===pg) deselectMovable(); });
+    pagesWrap.appendChild(pg);
+    if(!currentPage) currentPage=pg;
+    updateCounter();
+    return pg;
+  }
+
+  let currentPage = null;
+  const title = document.getElementById('titleInput');
+  const desc  = document.getElementById('descInput');
+
+  const initial = existing?.content ? String(existing.content).split('<!--PAGE_BREAK-->') : [''];
+  initial.forEach(html=> createPage(html||'<p></p>'));
+
+  // *** po napolnitvi pretvori data-% -> px, da je urejanje poravnano
+  [...pagesWrap.children].forEach(pg => applyPercentPositions(pg));
+
+  /* --- execCommand orodja za besedilo --- */
   document.querySelectorAll('[data-cmd]').forEach(b=> b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));
-  const paper=document.getElementById('paper');
-  const title=document.getElementById('titleInput');
-  const desc =document.getElementById('descInput');
+  const headings=document.getElementById('headings');
+  const fontName=document.getElementById('fontName');
+  const fontSize=document.getElementById('fontSize');
+  const foreColor=document.getElementById('foreColor');
+  const backColor=document.getElementById('backColor');
+  const sup=document.getElementById('sup');
+  const sub=document.getElementById('sub');
+  const linkBtn=document.getElementById('linkBtn');
+  const tableBtn=document.getElementById('tableBtn');
+  const clearFmt=document.getElementById('clearFmt');
+  const undoBtn=document.getElementById('undoBtn');
+  const redoBtn=document.getElementById('redoBtn');
+  const exportPdf=document.getElementById('exportPdf');
+  const exportHtml=document.getElementById('exportHtml');
+  const zIn=document.getElementById('zIn');
+  const zOut=document.getElementById('zOut');
+  const zVal=document.getElementById('zVal');
 
   foreColor.onchange=e=>document.execCommand('foreColor',false,e.target.value);
   backColor.onchange=e=>document.execCommand('hiliteColor',false,e.target.value);
@@ -764,41 +1066,6 @@ window.openEditor = function(existing=null){
   sup.onclick = ()=>document.execCommand('superscript',false,null);
   sub.onclick = ()=>document.execCommand('subscript',false,null);
   linkBtn.onclick=()=>{ const u=prompt('URL:'); if(u) document.execCommand('createLink',false,u); };
-
-  // NOVO: klik na 🖼️ → izberi lokalno sliko in jo naloži v Storage, nato vstavimo v vsebino
-  const inlineImgInput = document.getElementById('inlineImgInput');
-  const imgBtn = document.getElementById('imgBtn');
-  const imgUpWrap = document.getElementById('imgUpWrap');
-  const imgUpBar  = document.getElementById('imgUpBar');
-  const imgUpTxt  = document.getElementById('imgUpTxt');
-
-  imgBtn.onclick = ()=> inlineImgInput.click();
-  inlineImgInput.onchange = async (e)=>{
-    const f=e.target.files[0]; if(!f) return;
-    const safeName = f.name.replace(/\s+/g,'_');
-    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
-    imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
-
-    try{
-      const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
-      await new Promise((resolve,reject)=>{
-        task.on('state_changed', (snap)=>{
-          const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
-          imgUpBar.style.width = pct+'%';
-          imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
-        }, reject, resolve);
-      });
-      const url = await getDownloadURL(r);
-      document.execCommand('insertImage', false, url);
-      imgUpTxt.textContent='Končano ✔️';
-    }catch(err){
-      alert('Napaka pri nalaganju slike: '+(err?.message||err));
-      imgUpTxt.textContent='Napaka ❌';
-    }finally{
-      setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 800);
-      inlineImgInput.value='';
-    }
-  };
 
   tableBtn.onclick=()=>{
     const r=parseInt(prompt('Vrstice 1–10','3')||'3',10);
@@ -814,55 +1081,253 @@ window.openEditor = function(existing=null){
   redoBtn.onclick =()=>document.execCommand('redo',false,null);
   exportPdf.onclick=()=>window.print();
   exportHtml.onclick=()=>{
-    const blob=new Blob([paper.innerHTML],{type:'text/html;charset=utf-8'});
+    const html = pagesHTML().join('<!--PAGE_BREAK-->');
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(title.value||'clanek')+'.html'; a.click();
   };
 
-  // zoom
+  document.getElementById('addPageBtn').onclick = ()=>{
+    const pg = createPage('<p>&nbsp;</p>');
+    setTimeout(()=>{ pg.focus(); }, 0);
+  };
+
+  /* --- zoom na strani --- */
   let zoom=1;
   function fit(){
     const target=793;
     const free = window.innerWidth - 64 - 64 - 60;
     zoom = Math.max(0.6, Math.min(1.2, free/target));
-    paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%';
+    [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`);
+    zVal.innerText=Math.round(zoom*100)+'%';
+    // pri spremembi širine preracunaj data-% -> px
+    [...pagesWrap.children].forEach(pg => applyPercentPositions(pg));
   }
   window.addEventListener('resize',fit); fit();
-  zIn.onclick =()=>{ zoom=Math.min(2,zoom+0.1); paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%'; };
-  zOut.onclick=()=>{ zoom=Math.max(0.5,zoom-0.1); paper.style.transform=`scale(${zoom})`; zVal.innerText=Math.round(zoom*100)+'%'; };
+  zIn.onclick =()=>{ zoom=Math.min(2,zoom+0.1); [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`); zVal.innerText=Math.round(zoom*100)+'%'; };
+  zOut.onclick=()=>{ zoom=Math.max(0.5,zoom-0.1); [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`); zVal.innerText=Math.round(zoom*100)+'%'; };
 
-  // word count + draft
-  function wc(){ const n=(paper.innerText||'').trim().replace(/\s+/g,' ').split(' ').filter(Boolean).length; document.getElementById('wc').innerText=`${n} besed`; }
-  paper.addEventListener('input',()=>{wc(); saveDraftThrottled();}); wc();
+  /* --- števec besed + draft --- */
+  function textAllPages(){
+    return [...pagesWrap.children].map(p=> (p.innerText||'')).join(' ');
+  }
+  function wc(){
+    const n=(textAllPages()||'').trim().replace(/\s+/g,' ').split(' ').filter(Boolean).length;
+    document.getElementById('wc').innerText=`${n} besed`;
+  }
+  pagesWrap.addEventListener('input',()=>{ wc(); saveDraftThrottled(); });
+  wc();
+
   const draftKey= auth.currentUser? ('draft_'+auth.currentUser.uid): 'draft_guest';
-  let t=null; function saveDraftThrottled(){ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(draftKey, JSON.stringify({title:title.value,desc:desc.value,content:paper.innerHTML,editionId:editionSelect.value})), 600); }
-  if(!existing){
-    const raw=localStorage.getItem(draftKey); if(raw){ try{ const d=JSON.parse(raw); title.value=d.title||''; desc.value=d.desc||''; if(d.content) paper.innerHTML=d.content; if(d.editionId) editionSelect.value=d.editionId; }catch{} }
-  }else{
-    title.value=existing.title||''; desc.value=existing.desc||''; paper.innerHTML=existing.content||'<p></p>'; document.getElementById('saveBtn').dataset.editId=existing.id||''; if(existing.editionId) editionSelect.value=existing.editionId;
+  let t=null;
+
+  // *** zamenjana funkcija: shrani .movable relativno v %
+  function pagesHTML(){
+    return [...pagesWrap.children].map(p=> serializePageHTML(p));
   }
 
-  // NASLOVNA slika (upload iz računalnika → URL v polje "heroURL")
+  function saveDraftThrottled(){
+    clearTimeout(t);
+    t=setTimeout(()=>localStorage.setItem(
+      draftKey,
+      JSON.stringify({title:title.value,desc:desc.value,content:pagesHTML().join('<!--PAGE_BREAK-->'),editionId:editionSelect.value})
+    ), 600);
+  }
+  if(!existing){
+    const raw=localStorage.getItem(draftKey);
+    if(raw){
+      try{
+        const d=JSON.parse(raw);
+        title.value=d.title||'';
+        desc.value=d.desc||'';
+        if(d.content){
+          pagesWrap.innerHTML='';
+          String(d.content).split('<!--PAGE_BREAK-->').forEach(h=> createPage(h));
+          // po nalaganju drafta poravnaj
+          [...pagesWrap.children].forEach(pg => applyPercentPositions(pg));
+        }
+        if(d.editionId) editionSelect.value=d.editionId;
+      }catch{}
+    }
+  }else{
+    title.value=existing.title||'';
+    desc.value=existing.desc||'';
+    document.getElementById('saveBtn').dataset.editId=existing.id||'';
+  }
+
+  /* --- NASLOVNA slika (Storage) --- */
   let heroURL = existing?.img || '';
   imgUpload.onchange = async e=>{
     const f=e.target.files[0]; if(!f) return;
     const safeName = f.name.replace(/\s+/g,'_');
     const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
     try{
-      await uploadBytes(r,f); 
+      await uploadBytes(r,f);
       heroURL=await getDownloadURL(r);
       document.getElementById('imgHeroInfo').textContent='Slika naložena ✔️';
-      // po želji: tudi vstavi v vsebino
-      // document.execCommand('insertImage', false, heroURL);
     }catch(err){
       alert('Napaka pri nalaganju slike: '+(err?.message||err));
       document.getElementById('imgHeroInfo').textContent='Napaka ❌';
     }
   };
 
-  // save
+  /* --- INLINE SLIKE: naloži → vstavi kot .movable --- */
+  const inlineImgInput = document.getElementById('inlineImgInput');
+  const imgBtn = document.getElementById('imgBtn');
+  const imgUpWrap = document.getElementById('imgUpWrap');
+  const imgUpBar  = document.getElementById('imgUpBar');
+  const imgUpTxt  = document.getElementById('imgUpTxt');
+
+  imgBtn.onclick = ()=> inlineImgInput.click();
+  inlineImgInput.onchange = async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const safeName = f.name.replace(/\s+/g,'_');
+    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+    imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
+    try{
+      const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
+      await new Promise((resolve,reject)=>{
+        task.on('state_changed', (snap)=>{
+          const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+          imgUpBar.style.width = pct+'%';
+          imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
+        }, reject, resolve);
+      });
+      const url = await getDownloadURL(r);
+      insertMovableImage(url);
+      imgUpTxt.textContent='Končano ✔️';
+    }catch(err){
+      alert('Napaka pri nalaganju slike: '+(err?.message||err));
+      imgUpTxt.textContent='Napaka ❌';
+    }finally{
+      setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 700);
+      inlineImgInput.value='';
+    }
+  };
+
+  /* --- Premikanje & resize .movable --- */
+  let selMovable = null;
+  let dragMode = null; // 'move' | 'nw'|'ne'|'se'|'sw'
+  let startX=0, startY=0, startLeft=0, startTop=0, startW=0, startH=0;
+
+  function deselectMovable(){ if(selMovable){ selMovable.classList.remove('selected'); selMovable=null; } }
+
+  function selectMovable(el){
+    if(selMovable && selMovable!==el) selMovable.classList.remove('selected');
+    selMovable = el; selMovable.classList.add('selected');
+    selMovable.style.zIndex = String(Date.now() % 1e9);
+  }
+
+  function clampToPage(el){
+    const pg = el.parentElement;
+    const pw = pg.clientWidth;
+    const ph = pg.clientHeight;
+    let left = parseFloat(el.style.left)||0;
+    let top  = parseFloat(el.style.top)||0;
+    const w  = el.offsetWidth;
+    const h  = el.offsetHeight;
+    left = Math.max(0, Math.min(left, pw - w));
+    top  = Math.max(0, Math.min(top,  ph - h));
+    el.style.left = left + 'px';
+    el.style.top  = top  + 'px';
+  }
+
+  function insertMovableImage(url){
+    const pg = currentPage || createPage();
+    const wrap = document.createElement('div');
+    wrap.className='movable';
+    const maxInit = Math.min(pg.clientWidth * 0.4, 240);
+    wrap.style.left='20px'; wrap.style.top='20px';
+    wrap.style.width= Math.max(120, maxInit) + 'px';
+    wrap.style.height='auto';
+
+    const img = document.createElement('img');
+    img.src=url; img.draggable=false; img.style.width='100%'; img.style.height='auto';
+    wrap.appendChild(img);
+
+    ['nw','ne','se','sw'].forEach(h=>{
+      const s=document.createElement('div');
+      s.className='handle h-'+h; s.dataset.handle=h;
+      wrap.appendChild(s);
+    });
+
+    wrap.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      selectMovable(wrap);
+      const rect = wrap.getBoundingClientRect();
+      const pageRect = pg.getBoundingClientRect();
+      startX = e.clientX; startY = e.clientY;
+      startLeft = rect.left - pageRect.left + pg.scrollLeft;
+      startTop  = rect.top  - pageRect.top  + pg.scrollTop;
+      startW = rect.width; startH = rect.height;
+
+      const h = e.target.closest('.handle');
+      dragMode = h ? h.dataset.handle : 'move';
+
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', onDragEnd, { once:true });
+    });
+
+    pg.appendChild(wrap);
+    selectMovable(wrap);
+    clampToPage(wrap);
+  }
+
+  function onDrag(e){
+    if(!selMovable || !dragMode) return;
+    const pg = selMovable.parentElement;
+    const pw = pg.clientWidth, ph = pg.clientHeight;
+    const dx = (e.clientX - startX), dy = (e.clientY - startY);
+
+    if(dragMode==='move'){
+      let left = startLeft + dx;
+      let top  = startTop  + dy;
+      left = Math.max(0, Math.min(left, pw - selMovable.offsetWidth));
+      top  = Math.max(0, Math.min(top,  ph - selMovable.offsetHeight));
+      selMovable.style.left = left + 'px';
+      selMovable.style.top  = top  + 'px';
+    }else{
+      let newW = startW, newH = startH, newLeft = startLeft, newTop = startTop;
+
+      if(dragMode.includes('e')) newW = Math.max(40, startW + dx);
+      if(dragMode.includes('s')) newH = Math.max(40, startH + dy);
+      if(dragMode.includes('w')){ newW = Math.max(40, startW - dx); newLeft = startLeft + dx; }
+      if(dragMode.includes('n')){ newH = Math.max(40, startH - dy); newTop  = startTop  + dy; }
+
+      if(newLeft < 0){ newW += newLeft; newLeft = 0; }
+      if(newTop  < 0){ newH += newTop;  newTop  = 0; }
+      newW = Math.min(newW, pw - newLeft);
+      newH = Math.min(newH, ph - newTop);
+
+      selMovable.style.width = newW + 'px';
+      selMovable.style.height= newH + 'px';
+      selMovable.style.left  = newLeft + 'px';
+      selMovable.style.top   = newTop  + 'px';
+    }
+  }
+
+  function onDragEnd(){
+    dragMode=null;
+    if(selMovable) clampToPage(selMovable);
+    document.removeEventListener('mousemove', onDrag);
+  }
+
+  pagesWrap.addEventListener('paste', (e)=>{
+    if(e.clipboardData){
+      e.preventDefault();
+      const text = e.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, text);
+    }
+  });
+
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') deselectMovable(); });
+
+  /* --- Shrani --- */
   document.getElementById('saveBtn').onclick = async ()=>{
-    const base={ title:title.value.trim(), desc:desc.value.trim(), content:paper.innerHTML, img:heroURL,
-      author:auth.currentUser? auth.currentUser.email : 'Gost', edited:serverTimestamp(),
+    const base={ title:title.value.trim(), desc:desc.value.trim(),
+      content: pagesHTML().join('<!--PAGE_BREAK-->'),
+      img: heroURL,
+      author:auth.currentUser? auth.currentUser.email : 'Gost',
+      edited:serverTimestamp(),
       editionId: editionSelect.value || null
     };
     if(!base.title || !base.desc) return alert('Naslov in kratek opis sta obvezna.');
@@ -1365,7 +1830,7 @@ window.openAdmin = async function(){
 };
 
 /* ============================================================
-   RADIO stran (uporabnik): spored + obvestila
+   RADIO stran (uporabnik)
 ============================================================ */
 window.openRadio = function(){
   stage.innerHTML = `
@@ -1382,7 +1847,7 @@ window.openRadio = function(){
         <div class="glass" style="flex:1;min-width:360px;padding:12px">
           <h3 style="margin:0 0 8px 0">Spored</h3>
           <div id="queue"></div>
-          <div style="margin-top:8px;color:#cfe7ff">Predvajanje: okrogel gumb spodaj desno (play/pause).</div>
+          <div style="margin-top:8px;color:#cfe7ff">Predvajanje: okrogel gumb zgoraj desno (play/pause).</div>
         </div>
       </div>
     </div>
