@@ -1139,7 +1139,8 @@ window.openEditor = function(existing=null){
     pg.className='page';
     pg.contentEditable='true';
     pg.innerHTML = html || '<p>Začni pisati svoj članek tukaj…</p>';
-    pg.addEventListener('focus', ()=>{ currentPage = pg; });
+    pg.addEventListener('focusin', ()=>{ currentPage = pg; });
+pg.addEventListener('pointerdown', ()=>{ currentPage = pg; });
     // omogoči deselect slik ob kliku na ozadje
     pg.addEventListener('mousedown', (e)=>{ if(e.target===pg) deselectMovable(); });
     pagesWrap.appendChild(pg);
@@ -1150,6 +1151,24 @@ window.openEditor = function(existing=null){
 
   // initial pages (obstoječa vsebina)
   let currentPage = null;
+  // -- zanesljivo določanje aktivne strani
+function setCurrentPageFromEvent(e){
+  const n = e?.target || document.activeElement;
+  const el = (n && n.closest) ? n.closest('.page') : null;
+  if (el) currentPage = el;
+}
+pagesWrap.addEventListener('pointerdown', setCurrentPageFromEvent);
+pagesWrap.addEventListener('focusin', setCurrentPageFromEvent);
+
+// tudi ob spremembi selekcije (kurzor v besedilu)
+document.addEventListener('selectionchange', ()=>{
+  const sel = document.getSelection();
+  if(!sel || !sel.anchorNode) return;
+  const node = sel.anchorNode.nodeType===1 ? sel.anchorNode : sel.anchorNode.parentElement;
+  const pg = node && node.closest ? node.closest('.page') : null;
+  if(pg) currentPage = pg;
+});
+
   const title = document.getElementById('titleInput');
   const desc  = document.getElementById('descInput');
 
@@ -1290,33 +1309,40 @@ window.openEditor = function(existing=null){
   const imgUpWrap = document.getElementById('imgUpWrap');
   const imgUpBar  = document.getElementById('imgUpBar');
   const imgUpTxt  = document.getElementById('imgUpTxt');
+let targetPageForImage = null;
 
-  imgBtn.onclick = ()=> inlineImgInput.click();
-  inlineImgInput.onchange = async (e)=>{
-    const f=e.target.files[0]; if(!f) return;
-    const safeName = f.name.replace(/\s+/g,'_');
-    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
-    imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
-    try{
-      const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
-      await new Promise((resolve,reject)=>{
-        task.on('state_changed', (snap)=>{
-          const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
-          imgUpBar.style.width = pct+'%';
-          imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
-        }, reject, resolve);
-      });
-      const url = await getDownloadURL(r);
-      insertMovableImage(url);
-      imgUpTxt.textContent='Končano ✔️';
-    }catch(err){
-      alert('Napaka pri nalaganju slike: '+(err?.message||err));
-      imgUpTxt.textContent='Napaka ❌';
-    }finally{
-      setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 700);
-      inlineImgInput.value='';
-    }
-  };
+  imgBtn.onclick = ()=>{
+  targetPageForImage = currentPage;  // zapomni aktivni list
+  inlineImgInput.click();
+};
+
+inlineImgInput.onchange = async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const safeName = f.name.replace(/\s+/g,'_');
+  const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+  imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
+  try{
+    const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
+    await new Promise((resolve,reject)=>{
+      task.on('state_changed', (snap)=>{
+        const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+        imgUpBar.style.width = pct+'%';
+        imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
+      }, reject, resolve);
+    });
+    const url = await getDownloadURL(r);
+    insertMovableImage(url, targetPageForImage);   // <-- vstavi v izbrani list
+    imgUpTxt.textContent='Končano ✔️';
+  }catch(err){
+    alert('Napaka pri nalaganju slike: '+(err?.message||err));
+    imgUpTxt.textContent='Napaka ❌';
+  }finally{
+    targetPageForImage = null;
+    setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 700);
+    inlineImgInput.value='';
+  }
+};
+
 
   /* --- Premikanje & resize .movable --- */
 let selMovable = null;
@@ -1346,15 +1372,38 @@ function clampToPage(el){
   el.style.top  = top  + 'px';
 }
 
-function insertMovableImage(url){
-  const pg = currentPage || createPage();
+function insertMovableImage(url, pageOverride){
+  const pg = pageOverride || currentPage || createPage();
   const wrap = document.createElement('div');
   wrap.className='movable';
-  // začetna širina: max 40% strani ali 240px
   const maxInit = Math.min(pg.clientWidth * 0.4, 240);
   wrap.style.left='20px'; wrap.style.top='20px';
   wrap.style.width= Math.max(120, maxInit) + 'px';
   wrap.style.height='auto';
+ wrap.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
+  selectMovable(wrap);
+
+  // zagotovimo, da prejemamo move/up tudi če gre kurzor iz elementa
+  try { wrap.setPointerCapture(e.pointerId); } catch {}
+
+  const rect = wrap.getBoundingClientRect();
+  const pageRect = pg.getBoundingClientRect();
+  startX = e.clientX; startY = e.clientY;
+  startLeft = rect.left - pageRect.left + pg.scrollLeft;
+  startTop  = rect.top  - pageRect.top  + pg.scrollTop;
+  startW = rect.width; startH = rect.height;
+
+  const h = e.target.closest('.handle');
+  dragMode = h ? h.dataset.handle : 'move';
+
+  // poslušamo na dokumentu – pointer dogodki
+  const move = (ev)=> onDrag(ev);
+  const up   = (ev)=> { onDragEnd(); document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup',   up, { once:true });
+});
 
   const img = document.createElement('img');
   img.src=url; img.draggable=false; img.style.width='100%'; img.style.height='auto';
@@ -1366,27 +1415,12 @@ function insertMovableImage(url){
     wrap.appendChild(s);
   });
 
-  // interakcije
-  wrap.addEventListener('mousedown', (e)=>{
-    e.preventDefault();
-    selectMovable(wrap);
-    const rect = wrap.getBoundingClientRect();
-    const pageRect = pg.getBoundingClientRect();
-    startX = e.clientX; startY = e.clientY;
-    startLeft = rect.left - pageRect.left + pg.scrollLeft;
-    startTop  = rect.top  - pageRect.top  + pg.scrollTop;
-    startW = rect.width; startH = rect.height;
-
-    const h = e.target.closest('.handle');
-    dragMode = h ? h.dataset.handle : 'move';
-
-    document.addEventListener('mousemove', onDrag);
-    document.addEventListener('mouseup', onDragEnd, { once:true });
-  });
-
+  // ... (ostane isto: mousedown, onDrag, clampToPage ...)
   pg.appendChild(wrap);
   selectMovable(wrap);
   clampToPage(wrap);
+  // po želji: scrollaj na stran
+  pg.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function onDrag(e){
@@ -1398,13 +1432,11 @@ function onDrag(e){
   if(dragMode==='move'){
     let left = startLeft + dx;
     let top  = startTop  + dy;
-    // ostani znotraj lista
     left = Math.max(0, Math.min(left, pw - selMovable.offsetWidth));
     top  = Math.max(0, Math.min(top,  ph - selMovable.offsetHeight));
     selMovable.style.left = left + 'px';
     selMovable.style.top  = top  + 'px';
   }else{
-    // resize + omejitve
     let newW = startW, newH = startH, newLeft = startLeft, newTop = startTop;
 
     if(dragMode.includes('e')) newW = Math.max(40, startW + dx);
@@ -1412,7 +1444,6 @@ function onDrag(e){
     if(dragMode.includes('w')){ newW = Math.max(40, startW - dx); newLeft = startLeft + dx; }
     if(dragMode.includes('n')){ newH = Math.max(40, startH - dy); newTop  = startTop  + dy; }
 
-    // ne dovoli čez rob
     if(newLeft < 0){ newW += newLeft; newLeft = 0; }
     if(newTop  < 0){ newH += newTop;  newTop  = 0; }
     newW = Math.min(newW, pw - newLeft);
@@ -1428,8 +1459,8 @@ function onDrag(e){
 function onDragEnd(){
   dragMode=null;
   if(selMovable) clampToPage(selMovable);
-  document.removeEventListener('mousemove', onDrag);
 }
+
 pagesWrap.addEventListener('paste', (e)=>{
   // prilepi samo čisti tekst (odstrani ogromne inline stile)
   if(e.clipboardData){
