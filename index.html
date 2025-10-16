@@ -1014,6 +1014,549 @@ applyPercentPositions(view);              // zdaj je “page” kar #viewA4
 };
 
 /* ============================================================
+   A4 UREJEVALNIK – več listov + plavajoče slike
+============================================================ */
+window.openEditor = function(existing=null){
+  stage.innerHTML = `
+    <div class="glass" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800">✍️ Urejevalnik (A4)</div>
+      <div>
+        <button class="btn" id="saveBtn">💾 Shrani</button>
+        <button class="btn ghost" id="backBtn">Nazaj</button>
+      </div>
+    </div>
+
+    <div class="editor-stage">
+      <!-- orodja levo -->
+      <div class="tool-left">
+        <select class="sel" id="fontName">
+          <option value="inherit">Font</option>
+          <option>Arial</option><option>Times New Roman</option>
+          <option>Georgia</option><option>Calibri</option><option>Cambria</option>
+        </select>
+        <select class="sel" id="fontSize">
+          <option value="2">10pt</option><option value="3" selected>12pt</option>
+          <option value="4">14pt</option><option value="5">18pt</option><option value="6">24pt</option>
+        </select>
+        <select class="sel" id="headings">
+          <option value="P">Navadno</option>
+          <option value="H1">H1</option><option value="H2">H2</option><option value="H3">H3</option>
+        </select>
+        <input type="color" id="foreColor" title="Barva besedila">
+        <input type="color" id="backColor" title="Ozadje besedila">
+        <button class="btn" data-cmd="bold"><b>B</b></button>
+        <button class="btn" data-cmd="italic"><i>I</i></button>
+        <button class="btn" data-cmd="underline"><u>U</u></button>
+        <button class="btn" data-cmd="strikeThrough">S</button>
+        <button class="btn" data-cmd="insertUnorderedList">•</button>
+        <button class="btn" data-cmd="insertOrderedList">1.</button>
+        <button class="btn" data-cmd="outdent">↤</button>
+        <button class="btn" data-cmd="indent">↦</button>
+      </div>
+
+      <!-- listi -->
+      <div class="a4-wrap">
+        <div style="max-width:210mm;width:100%;">
+          <div class="meta-box">
+            <input class="meta-title" id="titleInput" placeholder="Naslov članka">
+            <textarea class="meta-desc" id="descInput" maxlength="150" placeholder="Kratek opis (za seznam) – do 150 znakov"></textarea>
+            <div style="display:flex; gap:8px; margin-top:6px; align-items:center">
+              <label style="color:#163a66; font-weight:800">Izdaja:</label>
+              <select id="editionSelect" class="sel" style="max-width:340px"></select>
+              <small style="color:#456">(izberi številko izdaje)</small>
+            </div>
+          </div>
+
+          <div id="pages" class="pages"></div>
+          <div style="text-align:center;color:#7a8aa0;margin:8px 0"><span id="pageCounter">Stran 1</span></div>
+
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <label>Naslovna slika: </label>
+            <input id="imgUpload" type="file" accept="image/*" class="input" style="max-width:320px">
+            <span id="imgHeroInfo" style="color:#163a66;font-size:12px"></span>
+          </div>
+
+          <!-- skriti input za inline sliko + progress -->
+          <input id="inlineImgInput" type="file" accept="image/*" style="display:none">
+          <div id="imgUpWrap" style="height:6px;background:#eee;border-radius:6px;overflow:hidden;margin-top:6px;display:none">
+            <div id="imgUpBar" style="height:100%;width:0%;background:#24c1ff;transition:width .15s linear"></div>
+          </div>
+          <div id="imgUpTxt" style="font-size:12px;color:#234;margin-top:4px;display:none">Pripravljeno…</div>
+        </div>
+      </div>
+
+      <!-- orodja desno -->
+      <div class="tool-right">
+        <button class="btn" id="sup">x²</button>
+        <button class="btn" id="sub">x₂</button>
+        <button class="btn" id="addPageBtn">➕ Stran</button>
+        <button class="btn" id="linkBtn">🔗</button>
+        <button class="btn" id="imgBtn">🖼️</button>
+        <button class="btn" id="tableBtn">▦</button>
+        <button class="btn" id="clearFmt">⌫</button>
+        <button class="btn" id="undoBtn">↶</button>
+        <button class="btn" id="redoBtn">↷</button>
+        <button class="btn" id="exportPdf">🖨️</button>
+        <button class="btn" id="exportHtml">⬇️</button>
+        <div class="glass" style="padding:6px 8px;text-align:center">
+          <div>Zoom</div>
+          <button class="btn" id="zOut">−</button>
+          <div id="zVal" style="padding:4px 0;font-weight:800">100%</div>
+          <button class="btn" id="zIn">＋</button>
+          <div id="wc" style="margin-top:6px;font-size:12px;color:#e4f6ff">0 besed</div>
+        </div>
+      </div>
+    </div>
+  `;
+  backify();
+
+  /* --- napolni izdaje --- */
+  const sel = document.getElementById('editionSelect');
+  sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
+  onSnapshot(
+    query(collection(db,'editions'), where('published','==',true), orderBy('year','desc'), orderBy('month','desc')),
+    (snap)=>{
+      sel.innerHTML = `<option value="">— izberi izdajo —</option>`;
+      snap.forEach(ed=>{
+        const e=ed.data();
+        const title = e.title?.trim() || `Izdaja ${String(e.month).padStart(2,'0')}/${e.year}`;
+        const opt = document.createElement('option');
+        opt.value = ed.id; opt.textContent = title;
+        sel.appendChild(opt);
+      });
+      if(existing?.editionId) sel.value = existing.editionId;
+    }
+  );
+
+  /* --- helperji za strani --- */
+  const pagesWrap = document.getElementById('pages');
+  const pageCounter = document.getElementById('pageCounter');
+
+  function updateCounter(){ pageCounter.textContent = `Strani: ${pagesWrap.children.length}`; }
+
+  function createPage(html=''){
+    const pg = document.createElement('div');
+    pg.className='page';
+    pg.contentEditable='true';
+    pg.innerHTML = html || '<p>Začni pisati svoj članek tukaj…</p>';
+    pg.addEventListener('focusin', ()=>{ currentPage = pg; });
+pg.addEventListener('pointerdown', ()=>{ currentPage = pg; });
+    // omogoči deselect slik ob kliku na ozadje
+    pg.addEventListener('mousedown', (e)=>{ if(e.target===pg) deselectMovable(); });
+    pagesWrap.appendChild(pg);
+    if(!currentPage) currentPage=pg;
+    updateCounter();
+    return pg;
+  }
+
+  // initial pages (obstoječa vsebina)
+  let currentPage = null;
+  // -- zanesljivo določanje aktivne strani
+function setCurrentPageFromEvent(e){
+  const n = e?.target || document.activeElement;
+  const el = (n && n.closest) ? n.closest('.page') : null;
+  if (el) currentPage = el;
+}
+pagesWrap.addEventListener('pointerdown', setCurrentPageFromEvent);
+pagesWrap.addEventListener('focusin', setCurrentPageFromEvent);
+
+// tudi ob spremembi selekcije (kurzor v besedilu)
+document.addEventListener('selectionchange', ()=>{
+  const sel = document.getSelection();
+  if(!sel || !sel.anchorNode) return;
+  const node = sel.anchorNode.nodeType===1 ? sel.anchorNode : sel.anchorNode.parentElement;
+  const pg = node && node.closest ? node.closest('.page') : null;
+  if(pg) currentPage = pg;
+});
+
+  const title = document.getElementById('titleInput');
+  const desc  = document.getElementById('descInput');
+
+  const initial = existing?.content ? String(existing.content).split('<!--PAGE_BREAK-->') : [''];
+  initial.forEach(html=> createPage(html||'<p></p>'));
+  [...pagesWrap.children].forEach(pg => applyPercentPositions(pg));
+
+
+  /* --- execCommand orodja za besedilo --- */
+  document.querySelectorAll('[data-cmd]').forEach(b=> b.onclick=()=>document.execCommand(b.dataset.cmd,false,null));
+  const headings=document.getElementById('headings');
+  const fontName=document.getElementById('fontName');
+  const fontSize=document.getElementById('fontSize');
+  const foreColor=document.getElementById('foreColor');
+  const backColor=document.getElementById('backColor');
+  const sup=document.getElementById('sup');
+  const sub=document.getElementById('sub');
+  const linkBtn=document.getElementById('linkBtn');
+  const tableBtn=document.getElementById('tableBtn');
+  const clearFmt=document.getElementById('clearFmt');
+  const undoBtn=document.getElementById('undoBtn');
+  const redoBtn=document.getElementById('redoBtn');
+  const exportPdf=document.getElementById('exportPdf');
+  const exportHtml=document.getElementById('exportHtml');
+  const zIn=document.getElementById('zIn');
+  const zOut=document.getElementById('zOut');
+  const zVal=document.getElementById('zVal');
+
+  foreColor.onchange=e=>document.execCommand('foreColor',false,e.target.value);
+  backColor.onchange=e=>document.execCommand('hiliteColor',false,e.target.value);
+  fontName.onchange=e=>document.execCommand('fontName',false,e.target.value);
+  fontSize.onchange=e=>document.execCommand('fontSize',false,e.target.value);
+  headings.onchange=e=>document.execCommand('formatBlock',false, e.target.value==='P'?'p':e.target.value);
+  sup.onclick = ()=>document.execCommand('superscript',false,null);
+  sub.onclick = ()=>document.execCommand('subscript',false,null);
+  linkBtn.onclick=()=>{ const u=prompt('URL:'); if(u) document.execCommand('createLink',false,u); };
+
+  tableBtn.onclick=()=>{
+    const r=parseInt(prompt('Vrstice 1–10','3')||'3',10);
+    const c=parseInt(prompt('Stolpci 1–10','3')||'3',10);
+    if(r>0&&c>0&&r<=10&&c<=10){
+      let html='<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;">';
+      for(let i=0;i<r;i++){ html+='<tr>'; for(let j=0;j<c;j++){ html+='<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>'; } html+='</tr>'; }
+      html+='</table>'; document.execCommand('insertHTML',false,html);
+    }
+  };
+  clearFmt.onclick=()=>{document.execCommand('removeFormat',false,null);document.execCommand('unlink',false,null)};
+  undoBtn.onclick =()=>document.execCommand('undo',false,null);
+  redoBtn.onclick =()=>document.execCommand('redo',false,null);
+  exportPdf.onclick=()=>window.print();
+  exportHtml.onclick=()=>{
+    const html = pagesHTML().join('<!--PAGE_BREAK-->');
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(title.value||'clanek')+'.html'; a.click();
+  };
+
+  // dodaj novo stran
+  document.getElementById('addPageBtn').onclick = ()=>{
+    const pg = createPage('<p>&nbsp;</p>');
+    setTimeout(()=>{ pg.focus(); }, 0);
+  };
+
+  /* --- zoom na strani --- */
+  let zoom=1;
+  function fit(){
+    const target=793;
+    const free = window.innerWidth - 64 - 64 - 60;
+    zoom = Math.max(0.6, Math.min(1.2, free/target));
+    [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`);
+    zVal.innerText=Math.round(zoom*100)+'%';
+  }
+  window.addEventListener('resize',fit); fit();
+  zIn.onclick =()=>{ zoom=Math.min(2,zoom+0.1); [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`); zVal.innerText=Math.round(zoom*100)+'%'; };
+  zOut.onclick=()=>{ zoom=Math.max(0.5,zoom-0.1); [...pagesWrap.children].forEach(p=> p.style.transform=`scale(${zoom})`); zVal.innerText=Math.round(zoom*100)+'%'; };
+
+  /* --- števec besed + draft --- */
+  function textAllPages(){
+    return [...pagesWrap.children].map(p=> (p.innerText||'')).join(' ');
+  }
+  function wc(){
+    const n=(textAllPages()||'').trim().replace(/\s+/g,' ').split(' ').filter(Boolean).length;
+    document.getElementById('wc').innerText=`${n} besed`;
+  }
+  pagesWrap.addEventListener('input',()=>{ wc(); saveDraftThrottled(); });
+  wc();
+
+  const draftKey= auth.currentUser? ('draft_'+auth.currentUser.uid): 'draft_guest';
+  let t=null;
+  function pagesHTML(){
+  return [...pagesWrap.children].map(p=> serializePageHTML(p));
+}
+  function saveDraftThrottled(){
+    clearTimeout(t);
+    t=setTimeout(()=>localStorage.setItem(
+      draftKey,
+      JSON.stringify({title:title.value,desc:desc.value,content:pagesHTML().join('<!--PAGE_BREAK-->'),editionId:editionSelect.value})
+    ), 600);
+  }
+  if(!existing){
+    const raw=localStorage.getItem(draftKey);
+    if(raw){
+      try{
+        const d=JSON.parse(raw);
+        title.value=d.title||'';
+        desc.value=d.desc||'';
+        if(d.content){
+          pagesWrap.innerHTML='';
+          String(d.content).split('<!--PAGE_BREAK-->').forEach(h=> createPage(h));
+        }
+        if(d.editionId) editionSelect.value=d.editionId;
+      }catch{}
+    }
+  }else{
+    title.value=existing.title||'';
+    desc.value=existing.desc||'';
+    document.getElementById('saveBtn').dataset.editId=existing.id||'';
+  }
+
+  /* --- NASLOVNA slika (Storage) --- */
+  let heroURL = existing?.img || '';
+  imgUpload.onchange = async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const safeName = f.name.replace(/\s+/g,'_');
+    const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+    try{
+      await uploadBytes(r,f);
+      heroURL=await getDownloadURL(r);
+      document.getElementById('imgHeroInfo').textContent='Slika naložena ✔️';
+    }catch(err){
+      alert('Napaka pri nalaganju slike: '+(err?.message||err));
+      document.getElementById('imgHeroInfo').textContent='Napaka ❌';
+    }
+  };
+
+  /* --- INLINE SLIKE: naloži → vstavi kot .movable na trenutno stran --- */
+  const inlineImgInput = document.getElementById('inlineImgInput');
+  const imgBtn = document.getElementById('imgBtn');
+  const imgUpWrap = document.getElementById('imgUpWrap');
+  const imgUpBar  = document.getElementById('imgUpBar');
+  const imgUpTxt  = document.getElementById('imgUpTxt');
+let targetPageForImage = null;
+
+  imgBtn.onclick = ()=>{
+  targetPageForImage = currentPage;  // zapomni aktivni list
+  inlineImgInput.click();
+};
+
+inlineImgInput.onchange = async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const safeName = f.name.replace(/\s+/g,'_');
+  const r=sRef(st,'articleImages/'+Date.now()+'_'+safeName);
+  imgUpWrap.style.display='block'; imgUpTxt.style.display='block'; imgUpBar.style.width='0%'; imgUpTxt.textContent='Nalaganje…';
+  try{
+    const task = uploadBytesResumable(r, f, {contentType: f.type||'image/jpeg'});
+    await new Promise((resolve,reject)=>{
+      task.on('state_changed', (snap)=>{
+        const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+        imgUpBar.style.width = pct+'%';
+        imgUpTxt.textContent = `Nalaganje slike: ${pct}%`;
+      }, reject, resolve);
+    });
+    const url = await getDownloadURL(r);
+    insertMovableImage(url, targetPageForImage);   // <-- vstavi v izbrani list
+    imgUpTxt.textContent='Končano ✔️';
+  }catch(err){
+    alert('Napaka pri nalaganju slike: '+(err?.message||err));
+    imgUpTxt.textContent='Napaka ❌';
+  }finally{
+    targetPageForImage = null;
+    setTimeout(()=>{ imgUpWrap.style.display='none'; imgUpTxt.style.display='none'; imgUpBar.style.width='0%'; }, 700);
+    inlineImgInput.value='';
+  }
+};
+
+
+  /* --- Premikanje & resize .movable --- */
+let selMovable = null;
+let dragMode = null; // 'move' | 'nw'|'ne'|'se'|'sw'
+let startX=0, startY=0, startLeft=0, startTop=0, startW=0, startH=0;
+
+function deselectMovable(){ if(selMovable){ selMovable.classList.remove('selected'); selMovable=null; } }
+
+function selectMovable(el){
+  if(selMovable && selMovable!==el) selMovable.classList.remove('selected');
+  selMovable = el; selMovable.classList.add('selected');
+  // dvigni izbran element nad ostale
+  selMovable.style.zIndex = String(Date.now() % 1e9);
+}
+
+function clampToPage(el){
+  const pg = el.parentElement;
+  const pw = pg.clientWidth;
+  const ph = pg.clientHeight;
+  let left = parseFloat(el.style.left)||0;
+  let top  = parseFloat(el.style.top)||0;
+  const w  = el.offsetWidth;
+  const h  = el.offsetHeight;
+  left = Math.max(0, Math.min(left, pw - w));
+  top  = Math.max(0, Math.min(top,  ph - h));
+  el.style.left = left + 'px';
+  el.style.top  = top  + 'px';
+}
+
+function insertMovableImage(url, pageOverride){
+  const pg = pageOverride || currentPage || createPage();
+  const wrap = document.createElement('div');
+  wrap.className='movable';
+  const maxInit = Math.min(pg.clientWidth * 0.4, 240);
+  wrap.style.left='20px'; wrap.style.top='20px';
+  wrap.style.width= Math.max(120, maxInit) + 'px';
+  wrap.style.height='auto';
+ wrap.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
+  selectMovable(wrap);
+
+  // zagotovimo, da prejemamo move/up tudi če gre kurzor iz elementa
+  try { wrap.setPointerCapture(e.pointerId); } catch {}
+
+  const rect = wrap.getBoundingClientRect();
+  const pageRect = pg.getBoundingClientRect();
+  startX = e.clientX; startY = e.clientY;
+  startLeft = rect.left - pageRect.left + pg.scrollLeft;
+  startTop  = rect.top  - pageRect.top  + pg.scrollTop;
+  startW = rect.width; startH = rect.height;
+
+  const h = e.target.closest('.handle');
+  dragMode = h ? h.dataset.handle : 'move';
+
+  // poslušamo na dokumentu – pointer dogodki
+  const move = (ev)=> onDrag(ev);
+  const up   = (ev)=> { onDragEnd(); document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup',   up, { once:true });
+});
+
+  const img = document.createElement('img');
+  img.src=url; img.draggable=false; img.style.width='100%'; img.style.height='auto';
+  wrap.appendChild(img);
+
+  ['nw','ne','se','sw'].forEach(h=>{
+    const s=document.createElement('div');
+    s.className='handle h-'+h; s.dataset.handle=h;
+    wrap.appendChild(s);
+  });
+
+  // ... (ostane isto: mousedown, onDrag, clampToPage ...)
+  pg.appendChild(wrap);
+  selectMovable(wrap);
+  clampToPage(wrap);
+  // po želji: scrollaj na stran
+  pg.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function onDrag(e){
+  if(!selMovable || !dragMode) return;
+  const pg = selMovable.parentElement;
+  const pw = pg.clientWidth, ph = pg.clientHeight;
+  const dx = (e.clientX - startX), dy = (e.clientY - startY);
+
+  if(dragMode==='move'){
+    let left = startLeft + dx;
+    let top  = startTop  + dy;
+    left = Math.max(0, Math.min(left, pw - selMovable.offsetWidth));
+    top  = Math.max(0, Math.min(top,  ph - selMovable.offsetHeight));
+    selMovable.style.left = left + 'px';
+    selMovable.style.top  = top  + 'px';
+  }else{
+    let newW = startW, newH = startH, newLeft = startLeft, newTop = startTop;
+
+    if(dragMode.includes('e')) newW = Math.max(40, startW + dx);
+    if(dragMode.includes('s')) newH = Math.max(40, startH + dy);
+    if(dragMode.includes('w')){ newW = Math.max(40, startW - dx); newLeft = startLeft + dx; }
+    if(dragMode.includes('n')){ newH = Math.max(40, startH - dy); newTop  = startTop  + dy; }
+
+    if(newLeft < 0){ newW += newLeft; newLeft = 0; }
+    if(newTop  < 0){ newH += newTop;  newTop  = 0; }
+    newW = Math.min(newW, pw - newLeft);
+    newH = Math.min(newH, ph - newTop);
+
+    selMovable.style.width = newW + 'px';
+    selMovable.style.height= newH + 'px';
+    selMovable.style.left  = newLeft + 'px';
+    selMovable.style.top   = newTop  + 'px';
+  }
+}
+
+function onDragEnd(){
+  dragMode=null;
+  if(selMovable) clampToPage(selMovable);
+}
+
+pagesWrap.addEventListener('paste', (e)=>{
+  // prilepi samo čisti tekst (odstrani ogromne inline stile)
+  if(e.clipboardData){
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  }
+});
+
+
+  // deselect ob ESC
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') deselectMovable(); });
+
+  /* --- Shrani --- */
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const base={ title:title.value.trim(), desc:desc.value.trim(),
+      content: pagesHTML().join('<!--PAGE_BREAK-->'),
+      img: heroURL,
+      author:auth.currentUser? auth.currentUser.email : 'Gost',
+      edited:serverTimestamp(),
+      editionId: editionSelect.value || null
+    };
+    if(!base.title || !base.desc) return alert('Naslov in kratek opis sta obvezna.');
+    if(!base.editionId) if(!confirm('Članek ni dodeljen nobeni izdaji. Nadaljujem?')) return;
+    const id = document.getElementById('saveBtn').dataset.editId;
+    try{
+      if(id){ await updateDoc(doc(db,'articles',id), base); alert('Posodobljeno.'); }
+      else { await addDoc(collection(db,'articles'), {...base, created:serverTimestamp(), approved:false}); alert('Poslano uredniku.'); }
+      localStorage.removeItem(draftKey); navigate('home');
+    }catch(e){ alert('Napaka pri shranjevanju: '+e.message); }
+  };
+};
+// === [FIX] Odpri editor za ČASOPIS z gumbom “Objavi časopis”
+window.openEditorForNewspaper = function(editionId, existing) {
+  // recikliramo UI urejevalnika
+  window.openEditor(existing);
+  // Ne shranjuj kot “članek” – to je časopis.
+const saveBtn = document.getElementById('saveBtn');
+if (saveBtn) saveBtn.dataset.editId = '';  // izklopi update na 'articles'
+
+
+  // naslov/desc – izpolni iz obstoječega časopisa
+  const titleInput = document.getElementById('titleInput');
+  const descInput  = document.getElementById('descInput');
+  if (existing?.title) titleInput.value = existing.title;
+  if (existing?.desc)  descInput.value  = existing.desc;
+
+  // skrij/zakleni izbor izdaje (časopis je vezan na konkretno izdajo)
+  const editionSelect = document.getElementById('editionSelect');
+  if (editionSelect) {
+    editionSelect.value = editionId;
+    editionSelect.disabled = true;
+    editionSelect.title = 'Časopis je vezan na to izdajo';
+  }
+
+  // dodaj “Objavi časopis” zraven Shrani
+  let publishBtn = document.getElementById('publishNewspaperBtn');
+  if (!publishBtn) {
+    publishBtn = document.createElement('button');
+    publishBtn.className = 'btn ok';
+    publishBtn.id = 'publishNewspaperBtn';
+    publishBtn.textContent = '📰 Objavi časopis';
+    saveBtn.insertAdjacentElement('beforebegin', publishBtn);
+  }
+
+  publishBtn.onclick = async () => {
+    try {
+      const pagesWrap = document.getElementById('pages');
+      const joinedHTML = [...pagesWrap.children]
+        .map(p => serializePageHTML(p))   // % pozicije za .movable
+        .join('<!--PAGE_BREAK-->');
+
+      const edRef = doc(db, 'editions', editionId);
+      const edSnap = await getDoc(edRef);
+      const ed = edSnap.data() || {};
+      const humanTitle = ed.title?.trim() || `Izdaja ${String(ed.month).padStart(2,'0')}/${ed.year}`;
+
+      await updateDoc(edRef, {
+        newspaperHtml: joinedHTML,       // objavljena različica
+        newspaperDraft: joinedHTML,      // tudi draft posodobimo
+        newspaperTitle: `DigiPiflarček — ${humanTitle}`,
+        newspaperPublished: true,
+        updated: serverTimestamp()
+      });
+
+      alert('Časopis objavljen. V izdaji bo prikazan nad članki.');
+      navigate('admin');
+    } catch (e) {
+      alert('Napaka pri objavi časopisa: ' + (e?.message || e));
+    }
+  };
+};
+
+
+
+/* ============================================================
    PROFIL
 ============================================================ */
 window.openProfile = function(){
@@ -1748,375 +2291,6 @@ else if(location.hash==='#profile') window.openProfile();
 else if(location.hash==='#admin') window.openAdmin();
 else window.openEditions();
 </script>
-
-<!-- === Digipiflarček: open editor in same tab === -->
-<script>
-(function(){
-  // Open new article
-  // Explicit helpers you might call from UI buttons:
-  window.openNewArticle = function(){ location.href = 'urejevalnik.html?new=1'; };
-  window.openEditArticle = function(id){ location.href = 'urejevalnik.html?id=' + encodeURIComponent(id); };
-  window.openEditEdition = function(editionId){ location.href = 'urejevalnik.html?edition=' + encodeURIComponent(editionId); };
-})();
-</script>
-
-
-<!-- === FORCE same-tab editor + Firebase handoff === -->
-<script>
-(function(){
-  function storeFirebaseConfig(){
-    try {
-      // Try to extract options from modular SDK instances if present
-      var cfg = null;
-      if (window.db && window.db.app && window.db.app.options) cfg = window.db.app.options;
-      else if (window.auth && window.auth.app && window.auth.app.options) cfg = window.auth.app.options;
-      // Try common globals used in apps
-      else if (window.firebaseConfig) cfg = window.firebaseConfig;
-      else if (window.__FIREBASE_CONFIG__) cfg = window.__FIREBASE_CONFIG__;
-      if (cfg) sessionStorage.setItem('fb_options', JSON.stringify(cfg));
-    } catch(e) { /* ignore */ }
-  }
-
-  function gotoEditor(url){
-    storeFirebaseConfig();
-    location.href = url;
-  }
-
-  // Hard override any previous definition
-  try {
-    Object.defineProperty(window, 'openEditor', {
-      configurable: true,
-      writable: true,
-      value: function(existing){
-        if (existing && existing.id) gotoEditor('urejevalnik.html?id=' + encodeURIComponent(existing.id));
-        else gotoEditor('urejevalnik.html?new=1');
-      }
-    });
-  } catch(e) {
-    }
-
-  // Also expose explicit helpers
-  window.openNewArticle  = function(){ gotoEditor('urejevalnik.html?new=1'); };
-  window.openEditArticle = function(id){ gotoEditor('urejevalnik.html?id=' + encodeURIComponent(id)); };
-  window.openEditEdition = function(editionId){ gotoEditor('urejevalnik.html?edition=' + encodeURIComponent(editionId)); };
-
-  // Optional: auto-bind buttons by data-action if present
-  document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-action]');
-    if(!t) return;
-    var a = t.getAttribute('data-action');
-    if(a === 'add-article'){ e.preventDefault(); window.openNewArticle(); }
-  });
-})();
-</script>
-
-
-<script>
-// Hard override: there's NO internal editor anymore.
-(function(){
-  function storeFirebaseConfig(){
-    try {
-      var cfg = null;
-      if (window.db && window.db.app && window.db.app.options) cfg = window.db.app.options;
-      else if (window.auth && window.auth.app && window.auth.app.options) cfg = window.auth.app.options;
-      else if (window.firebaseConfig) cfg = window.firebaseConfig;
-      else if (window.__FIREBASE_CONFIG__) cfg = window.__FIREBASE_CONFIG__;
-      if (cfg) sessionStorage.setItem('fb_options', JSON.stringify(cfg));
-    } catch(e) {}
-  }
-  function go(url){
-    storeFirebaseConfig();
-    location.replace(url); // same tab
-  }
-  // Replace render('editor', ...) to always redirect
-  if (!window.__render_editor_overridden){
-    const origRender = window.render;
-    window.render = function(view, params){
-      if(view === 'editor'){
-        go('urejevalnik.html' + (params && params.id ? ('?id='+encodeURIComponent(params.id)) : '?new=1'));
-        return;
-      }
-      return origRender ? origRender(view, params) : null;
-    };
-    window.__render_editor_overridden = true;
-  }
-  // Replace openEditor helpers
-  window.openNewArticle  = function(){ go('urejevalnik.html?new=1'); };
-  window.openEditArticle = function(id){ go('urejevalnik.html?id=' + encodeURIComponent(id)); };
-  window.openEditEdition = function(editionId){ go('urejevalnik.html?edition=' + encodeURIComponent(editionId)); };
-
-  // Bind "+ Članek" button defensively if present
-  document.addEventListener('click', function(e){
-    const t = e.target.closest('#btnAdd,[data-action="add-article"]');
-    if(t){ e.preventDefault(); window.openNewArticle(); }
-  });
-})();
-</script>
-
-
-<script>
-/* === FORCE ADMIN EDIT/REVIEW TO urejevalnik.html (no internal editor anywhere) === */
-(function(){
-  function storeFirebaseConfig(){
-    try{
-      var cfg=null;
-      if (window.db && window.db.app && window.db.app.options) cfg=window.db.app.options;
-      else if (window.auth && window.auth.app && window.auth.app.options) cfg=window.auth.app.options;
-      else if (window.firebaseConfig) cfg=window.firebaseConfig;
-      else if (window.__FIREBASE_CONFIG__) cfg=window.__FIREBASE_CONFIG__;
-      if (cfg) sessionStorage.setItem('fb_options', JSON.stringify(cfg));
-    }catch(e){}
-  }
-  function go(url){ storeFirebaseConfig(); location.href = url; }
-
-  // 1) Override common admin helpers if present
-  const fallback = function(id, src){
-    go('urejevalnik.html?id=' + encodeURIComponent(id) + (src ? '&src='+encodeURIComponent(src) : ''));
-  };
-  const noisyOverride = (name)=>{
-    try{
-      Object.defineProperty(window, name, { configurable:true, writable:true, value: function(id){ fallback(id, 'submissions'); } });
-    }catch(e){ window[name] = function(id){ fallback(id, 'submissions'); }; }
-  };
-  ['editSubmission','reviewSubmission','openSubmissionEditor','adminEditSubmission'].forEach(noisyOverride);
-  ['editArticle','adminEditArticle','openArticleEditor'].forEach((n)=>{
-    try{ Object.defineProperty(window, n, { configurable:true, writable:true, value: function(id){ fallback(id, 'articles'); } }); }
-    catch(e){ window[n] = function(id){ fallback(id, 'articles'); }; }
-  });
-
-  // 2) Intercept router-like calls
-  const origRender = window.render;
-  window.render = function(view, params){
-    if (view === 'editor' || view === 'submissionEditor' || view === 'adminEditor'){
-      const id = params && (params.id || params.articleId || params.submissionId);
-      const src = params && params.src ? params.src : (view === 'submissionEditor' ? 'submissions' : 'articles');
-      if (id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src='+encodeURIComponent(src));
-      else go('urejevalnik.html?new=1');
-      return;
-    }
-    return origRender ? origRender(view, params) : null;
-  };
-
-  // 3) Intercept navigation('editor', ...) signatures
-  const origNav = window.navigate;
-  window.navigate = function(view, params){
-    if (view && /editor/i.test(view)){
-      const id = params && (params.id || params.articleId || params.submissionId);
-      const src = params && params.src ? params.src : (/subm/.test(String(view)) ? 'submissions' : 'articles');
-      if (id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src='+encodeURIComponent(src));
-      else go('urejevalnik.html?new=1');
-      return;
-    }
-    return origNav ? origNav(view, params) : null;
-  };
-
-  // 4) Delegate clicks for admin tables/lists
-  document.addEventListener('click', function(e){
-    const t = e.target.closest('[data-action]');
-    if(!t) return;
-    const act = t.getAttribute('data-action');
-    const id  = t.getAttribute('data-id') || t.dataset.id || t.getAttribute('data-article-id') || t.getAttribute('data-submission-id');
-    if (!act) return;
-    if (/edit-submission|review-submission|open-submission/i.test(act)){
-      e.preventDefault(); if(id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=submissions');
-    }else if (/edit-article|open-article/i.test(act)){
-      e.preventDefault(); if(id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=articles');
-    }else if (/add-article|new-article/i.test(act)){
-      e.preventDefault(); go('urejevalnik.html?new=1');
-    }
-  });
-
-  // 5) Watch DOM (admin views often render later)
-  const mo = new MutationObserver(()=>{
-    document.querySelectorAll('.admin-edit, .review-edit').forEach(el=>{
-      if (!el.__aiBound){
-        el.__aiBound = true;
-        el.addEventListener('click', function(ev){
-          ev.preventDefault();
-          const id = el.getAttribute('data-id') || el.dataset.id;
-          const src = el.classList.contains('review-edit') ? 'submissions' : 'articles';
-          if(id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src='+src);
-        });
-      }
-    });
-  });
-  mo.observe(document.documentElement, {subtree:true, childList:true});
-})();
-</script>
-
-
-<script>
-/* ===== FORCE ALL EDIT FLOWS TO urejevalnik.html (no internal editor anywhere) ===== */
-(function(){
-  function firebaseOptions(){
-    try{
-      if (window.db && window.db.app && window.db.app.options) return window.db.app.options;
-      if (window.auth && window.auth.app && window.auth.app.options) return window.auth.app.options;
-      if (window.firebaseConfig) return window.firebaseConfig;
-      if (window.__FIREBASE_CONFIG__) return window.__FIREBASE_CONFIG__;
-    }catch(e){}
-    return null;
-  }
-  function storeFirebaseConfig(){
-    const cfg = firebaseOptions();
-    if (cfg) sessionStorage.setItem('fb_options', JSON.stringify(cfg));
-  }
-  function go(url){ storeFirebaseConfig(); location.href = url; }
-
-  // Reply to fb_options_request from urejevalnik.html (same-origin)
-  window.addEventListener('message', (ev)=>{
-    if(ev && ev.data && ev.data.type === 'fb_options_request'){
-      const cfg = firebaseOptions();
-      if(cfg) ev.source && ev.source.postMessage({type:'fb_options', payload: cfg}, ev.origin);
-    }
-  });
-
-  // Normalize helpers
-  window.openNewArticle  = function(){ go('urejevalnik.html?new=1'); };
-  window.openEditArticle = function(id){ go('urejevalnik.html?id=' + encodeURIComponent(id) + '&src=articles'); };
-  window.openEditEdition = function(editionId){ go('urejevalnik.html?edition=' + encodeURIComponent(editionId) + '&src=editions'); };
-  window.openSubmission  = function(id){ go('urejevalnik.html?id=' + encodeURIComponent(id) + '&src=submissions'); };
-
-  // Hard override common entry points (any internal calls will be redirected)
-  const names = [
-    'openEditor', 'openArticleEditor', 'openSubmissionEditor', 'adminEditSubmission', 'adminEditArticle',
-    'editSubmission', 'reviewSubmission', 'editArticle', 'editNewspaper', 'openNewspaperEditor'
-  ];
-  names.forEach(n=>{
-    try{
-      Object.defineProperty(window, n, { configurable:true, writable:true, value: function(arg){
-        if(n.match(/submission/i)) return window.openSubmission(arg && (arg.id||arg));
-        if(n.match(/newspaper|edition/i)) return window.openEditEdition(arg && (arg.id||arg));
-        if(n==='openEditor'){
-          if(arg && (arg.id||arg.articleId)) return window.openEditArticle(arg.id||arg.articleId);
-          return window.openNewArticle();
-        }
-        if(arg && (arg.id||arg.articleId)) return window.openEditArticle(arg.id||arg.articleId);
-        return window.openNewArticle();
-      }});
-    }catch(e){ window[n] = function(arg){
-      if(n.match(/submission/i)) return window.openSubmission(arg && (arg.id||arg));
-      if(n.match(/newspaper|edition/i)) return window.openEditEdition(arg && (arg.id||arg));
-      if(arg && (arg.id||arg.articleId)) return window.openEditArticle(arg.id||arg.articleId);
-      return window.openNewArticle();
-    }; }
-  });
-
-  // Intercept router-like calls
-  const origRender = window.render;
-  window.render = function(view, params){
-    if (view && /editor|submissionEditor|adminEditor|newspaper|editionEditor/i.test(view)){
-      const id  = params && (params.id || params.articleId || params.submissionId);
-      const ed  = params && (params.editionId || params.edition);
-      if(ed) go('urejevalnik.html?edition='+encodeURIComponent(ed)+'&src=editions');
-      else if(id && /subm/i.test(String(view))) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=submissions');
-      else if(id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=articles');
-      else go('urejevalnik.html?new=1');
-      return;
-    }
-    return origRender ? origRender(view, params) : null;
-  };
-  const origNav = window.navigate;
-  window.navigate = function(view, params, push){
-    if (view && /editor|submissionEditor|adminEditor|newspaper|editionEditor/i.test(view)){
-      const id  = params && (params.id || params.articleId || params.submissionId);
-      const ed  = params && (params.editionId || params.edition);
-      if(ed) go('urejevalnik.html?edition='+encodeURIComponent(ed)+'&src=editions');
-      else if(id && /subm/i.test(String(view))) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=submissions');
-      else if(id) go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=articles');
-      else go('urejevalnik.html?new=1');
-      return;
-    }
-    return origNav ? origNav(view, params, push) : null;
-  };
-
-  // Delegate clicks (for buttons/links rendered iz admin/list UI)
-  document.addEventListener('click', function(e){
-    const t = e.target.closest('[data-action],[data-editor],[data-edit],[data-submission-id],[data-article-id],[data-edition-id]');
-    if(!t) return;
-    let id = t.getAttribute('data-id') || t.dataset.id || t.getAttribute('data-article-id') || t.getAttribute('data-submission-id');
-    let ed = t.getAttribute('data-edition-id') || t.dataset.editionId;
-    const act = (t.getAttribute('data-action') || t.getAttribute('data-editor') || t.getAttribute('data-edit') || '').toLowerCase();
-    if(/add|new/.test(act) && /article/.test(act)){ e.preventDefault(); return window.openNewArticle(); }
-    if(ed || /newspaper|edition/.test(act)){ e.preventDefault(); return window.openEditEdition(ed || id); }
-    if(/submission/.test(act) && id){ e.preventDefault(); return window.openSubmission(id); }
-    if((/edit|editor/.test(act) || t.hasAttribute('data-article-id')) && id){ e.preventDefault(); return window.openEditArticle(id); }
-  });
-
-  // Remove any leftover inline-editor roots if present (hard cleanup)
-  const kill = ()=>{
-    document.querySelectorAll('#editorFullscreen, .aiEditorRoot, .wordlikeOverlay, .ribbon-editor, .inline-editor')
-      .forEach(el=> el.remove());
-  };
-  kill();
-  new MutationObserver(kill).observe(document.body, {childList:true, subtree:true});
-})();
-</script>
-
-
-<!-- FORCE: no internal editor; always redirect to urejevalnik.html -->
-<script>
-(function(){
-  function storeFirebaseConfig(){
-    try{
-      var cfg=null;
-      if (window.db && window.db.app && window.db.app.options) cfg=window.db.app.options;
-      else if (window.auth && window.auth.app && window.auth.app.options) cfg=window.auth.app.options;
-      else if (window.firebaseConfig) cfg=window.firebaseConfig;
-      else if (window.__FIREBASE_CONFIG__) cfg=window.__FIREBASE_CONFIG__;
-      if (cfg) sessionStorage.setItem('fb_options', JSON.stringify(cfg));
-    }catch(e){}
-  }
-  function go(url){ storeFirebaseConfig(); location.href = url; }
-
-  // Public helpers
-  window.openNewArticle  = function(){ go('urejevalnik.html?new=1'); };
-  window.openEditArticle = function(id){ go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=articles'); };
-  window.openSubmission  = function(id){ go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=submissions'); };
-  window.openEditEdition = function(id){ go('urejevalnik.html?edition='+encodeURIComponent(id)+'&src=editions'); };
-
-  // Override any internal calls
-  const wrap = (fn)=>function(view, params){
-    if (view && /editor|submissionEditor|adminEditor|editionEditor|newspaper/i.test(String(view))){
-      const id = params && (params.id || params.articleId || params.submissionId);
-      const ed = params && (params.editionId || params.edition);
-      if (ed) return go('urejevalnik.html?edition='+encodeURIComponent(ed)+'&src=editions');
-      if (id && /subm/i.test(String(view))) return go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=submissions');
-      if (id) return go('urejevalnik.html?id='+encodeURIComponent(id)+'&src=articles');
-      return go('urejevalnik.html?new=1');
-    }
-    return fn && fn(view, params);
-  };
-
-  if (window.render)  window.render  = wrap(window.render);
-  if (window.navigate) window.navigate = wrap(window.navigate);
-
-  // Bind common buttons generically
-  document.addEventListener('click', function(e){
-    const t = e.target.closest('[data-action],[data-article-id],[data-submission-id],[data-edition-id],#btnAdd');
-    if(!t) return;
-    const act = (t.getAttribute('data-action')||'').toLowerCase();
-    const aid = t.getAttribute('data-article-id') || t.getAttribute('data-id');
-    const sid = t.getAttribute('data-submission-id');
-    const eid = t.getAttribute('data-edition-id');
-    if (t.id==='btnAdd' || /add|new/.test(act)) { e.preventDefault(); return openNewArticle(); }
-    if (eid || /edition|newspaper/.test(act))   { e.preventDefault(); return openEditEdition(eid || aid); }
-    if (sid || /submission/.test(act))          { e.preventDefault(); return openSubmission(sid || aid); }
-    if (aid || /edit|article/.test(act))        { e.preventDefault(); return openEditArticle(aid); }
-  });
-
-  // Answer fb_options request from editor if needed
-  window.addEventListener('message', (ev)=>{
-    if(ev && ev.data && ev.data.type==='fb_options_request'){
-      try{
-        const cfg = (window.db && window.db.app && window.db.app.options) || (window.auth && window.auth.app && window.auth.app.options) || window.firebaseConfig || window.__FIREBASE_CONFIG__;
-        if(cfg) ev.source && ev.source.postMessage({type:'fb_options', payload: cfg}, ev.origin);
-      }catch(e){}
-    }
-  });
-})();
-</script>
-
 </body>
 </html>
 
